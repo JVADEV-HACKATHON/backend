@@ -24,12 +24,14 @@ type LoginRequest struct {
 }
 
 type RegisterRequest struct {
-	Nombre    string `json:"nombre" validate:"required,min=2,max=100"`
-	Direccion string `json:"direccion" validate:"required,min=5,max=200"`
-	Ciudad    string `json:"ciudad" validate:"required,min=2,max=50"`
-	Telefono  string `json:"telefono" validate:"omitempty,max=20"`
-	Email     string `json:"email" validate:"required,email"`
-	Password  string `json:"password" validate:"required,min=6"`
+	Nombre    string  `json:"nombre" validate:"required,min=2,max=100"`
+	Direccion string  `json:"direccion" validate:"required,min=5,max=200"`
+	Latitud   float64 `json:"latitud" validate:"required,latitude"`
+	Longitud  float64 `json:"longitud" validate:"required,longitude"`
+	Ciudad    string  `json:"ciudad" validate:"required,min=2,max=50"`
+	Telefono  string  `json:"telefono" validate:"omitempty,max=20"`
+	Email     string  `json:"email" validate:"required,email"`
+	Password  string  `json:"password" validate:"required,min=6"`
 }
 
 type LoginResponse struct {
@@ -118,6 +120,8 @@ func (s *AuthService) Register(req RegisterRequest) (*RegisterResponse, error) {
 	hospital := models.Hospital{
 		Nombre:    req.Nombre,
 		Direccion: req.Direccion,
+		Latitud:   req.Latitud,
+		Longitud:  req.Longitud,
 		Ciudad:    req.Ciudad,
 		Telefono:  req.Telefono,
 		Email:     req.Email,

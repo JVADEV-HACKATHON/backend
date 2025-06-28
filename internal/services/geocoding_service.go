@@ -4,10 +4,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"math"
 	"os"
 	"regexp"
 	"strings"
+
+	"hospital-api/internal/utils"
 
 	"googlemaps.github.io/maps"
 )
@@ -55,9 +56,9 @@ func (g *GeocodingService) GetCoordinatesFromAddress(address string) (*Coordinat
 		return nil, errors.New("la dirección no puede estar vacía")
 	}
 
-	// Agregar "La Paz, Bolivia" si no está incluido para mayor precisión
-	if !strings.Contains(strings.ToLower(cleanAddress), "la paz") {
-		cleanAddress = fmt.Sprintf("%s, La Paz, Bolivia", cleanAddress)
+	// Agregar "Santa Cruz, Bolivia" si no está incluido para mayor precisión
+	if !strings.Contains(strings.ToLower(cleanAddress), "santa cruz") {
+		cleanAddress = fmt.Sprintf("%s, Santa Cruz de la Sierra, Bolivia", cleanAddress)
 	}
 
 	// Realizar la geocodificación
@@ -91,9 +92,9 @@ func (g *GeocodingService) GetAddressComponents(address string) (*AddressCompone
 		return nil, errors.New("la dirección no puede estar vacía")
 	}
 
-	// Agregar "La Paz, Bolivia" si no está incluido
-	if !strings.Contains(strings.ToLower(cleanAddress), "la paz") {
-		cleanAddress = fmt.Sprintf("%s, La Paz, Bolivia", cleanAddress)
+	// Agregar "Santa Cruz, Bolivia" si no está incluido
+	if !strings.Contains(strings.ToLower(cleanAddress), "santa cruz") {
+		cleanAddress = fmt.Sprintf("%s, Santa Cruz de la Sierra, Bolivia", cleanAddress)
 	}
 
 	// Realizar la geocodificación
@@ -151,12 +152,12 @@ func (g *GeocodingService) GetAddressComponents(address string) (*AddressCompone
 	return components, nil
 }
 
-// ValidateCoordinates valida que las coordenadas estén dentro de los límites de La Paz
+// ValidateCoordinates valida que las coordenadas estén dentro de los límites de Santa Cruz
 func (g *GeocodingService) ValidateCoordinates(lat, lng float64) bool {
-	// Límites aproximados de La Paz, Bolivia
-	// Latitud: -16.7 a -16.4
-	// Longitud: -68.2 a -67.9
-	return lat >= -16.7 && lat <= -16.4 && lng >= -68.2 && lng <= -67.9
+	// Límites aproximados de Santa Cruz de la Sierra, Bolivia
+	// Latitud: -17.9 a -17.7
+	// Longitud: -63.3 a -63.0
+	return lat >= -17.9 && lat <= -17.7 && lng >= -63.3 && lng <= -63.0
 }
 
 // EvaluarPrecisionGeocoding evalúa qué tan precisa es la ubicación geocodificada
@@ -216,13 +217,13 @@ func (g *GeocodingService) EvaluarPrecisionGeocoding(address *AddressComponents)
 
 	result["confidence"] = confidence
 
-	// Distancia al centro de La Paz (Plaza Murillo: -16.4957, -68.1336)
-	centroPazLat, centroPazLng := -16.4957, -68.1336
-	distancia := calcularDistanciaHaversine(
+	// Distancia al centro de Santa Cruz (Plaza 24 de Septiembre: -17.7834, -63.1821)
+	centroSantaCruzLat, centroSantaCruzLng := -17.7834, -63.1821
+	distancia := utils.CalcularDistanciaHaversine(
 		address.Coordinates.Latitude,
 		address.Coordinates.Longitude,
-		centroPazLat,
-		centroPazLng)
+		centroSantaCruzLat,
+		centroSantaCruzLng)
 
 	result["distancia_centro_ciudad_km"] = distancia
 
@@ -240,25 +241,4 @@ func (g *GeocodingService) EvaluarPrecisionGeocoding(address *AddressComponents)
 	return result
 }
 
-// calcularDistanciaHaversine calcula la distancia entre dos puntos geográficos usando la fórmula de Haversine
-func calcularDistanciaHaversine(lat1, lng1, lat2, lng2 float64) float64 {
-	// Radio de la Tierra en km
-	const R = 6371.0
-
-	// Convertir a radianes
-	lat1Rad := lat1 * math.Pi / 180
-	lng1Rad := lng1 * math.Pi / 180
-	lat2Rad := lat2 * math.Pi / 180
-	lng2Rad := lng2 * math.Pi / 180
-
-	// Diferencias
-	dLat := lat2Rad - lat1Rad
-	dLng := lng2Rad - lng1Rad
-
-	// Fórmula de Haversine
-	a := math.Sin(dLat/2)*math.Sin(dLat/2) +
-		math.Cos(lat1Rad)*math.Cos(lat2Rad)*math.Sin(dLng/2)*math.Sin(dLng/2)
-	c := 2 * math.Atan2(math.Sqrt(a), math.Sqrt(1-a))
-
-	return R * c
-}
+// Eliminado y movido a utils.geospatial

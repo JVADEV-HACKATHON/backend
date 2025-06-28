@@ -1,16 +1,18 @@
 package seeders
 
 import (
-	"log"
-	"time"
-
+	"fmt"
 	"hospital-api/internal/database"
 	"hospital-api/internal/models"
+	"log"
+	"math/rand"
+	"time"
 
 	"golang.org/x/crypto/bcrypt"
 	"gorm.io/gorm"
 )
 
+// Seeder estructura principal para el seeding de datos
 type Seeder struct {
 	db *gorm.DB
 }
@@ -22,64 +24,376 @@ func NewSeeder() *Seeder {
 	}
 }
 
-// SeedAll ejecuta todos los seeders en orden
-func (s *Seeder) SeedAll() error {
-	log.Println("🌱 Iniciando seeding de la base de datos...")
-
-	// Orden de seeding (importante por las relaciones)
-	if err := s.SeedHospitales(); err != nil {
-		return err
-	}
-
-	if err := s.SeedPacientes(); err != nil {
-		return err
-	}
-
-	if err := s.SeedHistorialesClinico(); err != nil {
-		return err
-	}
-
-	log.Println("✅ Seeding completado exitosamente!")
-	return nil
-}
-
-// CleanDatabase limpia todas las tablas
+// CleanDatabase limpia todas las tablas de la base de datos
 func (s *Seeder) CleanDatabase() error {
 	log.Println("🧹 Limpiando base de datos...")
 
-	// Orden de limpieza (inverso por las relaciones)
-	if err := s.db.Exec("DELETE FROM historial_clinico").Error; err != nil {
-		return err
+	// Deshabilitar restricciones de clave foránea temporalmente
+	if err := s.db.Exec("SET foreign_key_checks = 0").Error; err != nil {
+		// Para PostgreSQL usar:
+		if err := s.db.Exec("SET CONSTRAINTS ALL DEFERRED").Error; err != nil {
+			log.Printf("⚠️ No se pudieron deshabilitar las restricciones: %v", err)
+		}
 	}
 
-	if err := s.db.Exec("DELETE FROM pacientes").Error; err != nil {
-		return err
+	// Limpiar tablas en orden para evitar problemas de claves foráneas
+	tables := []string{"historial_clinicos", "pacientes", "hospitals"}
+
+	for _, table := range tables {
+		if err := s.db.Exec(fmt.Sprintf("DELETE FROM %s", table)).Error; err != nil {
+			log.Printf("⚠️ Error limpiando tabla %s: %v", table, err)
+		} else {
+			log.Printf("✅ Tabla %s limpiada", table)
+		}
 	}
 
-	if err := s.db.Exec("DELETE FROM hospitales").Error; err != nil {
-		return err
+	// Rehabilitar restricciones de clave foránea
+	if err := s.db.Exec("SET foreign_key_checks = 1").Error; err != nil {
+		// Para PostgreSQL usar:
+		if err := s.db.Exec("SET CONSTRAINTS ALL IMMEDIATE").Error; err != nil {
+			log.Printf("⚠️ No se pudieron rehabilitar las restricciones: %v", err)
+		}
 	}
 
-	// Reiniciar secuencias
-	if err := s.db.Exec("ALTER SEQUENCE historial_clinico_id_seq RESTART WITH 1").Error; err != nil {
-		return err
-	}
-
-	if err := s.db.Exec("ALTER SEQUENCE pacientes_id_seq RESTART WITH 1").Error; err != nil {
-		return err
-	}
-
-	if err := s.db.Exec("ALTER SEQUENCE hospitales_id_seq RESTART WITH 1").Error; err != nil {
-		return err
-	}
-
-	log.Println("✅ Base de datos limpiada!")
+	log.Println("✅ Base de datos limpiada exitosamente")
 	return nil
 }
 
-// SeedHospitales inserta datos de hospitales
-func (s *Seeder) SeedHospitales() error {
-	log.Println("🏥 Seeding hospitales...")
+// SeedAll ejecuta todo el proceso de seeding
+func (s *Seeder) SeedAll() error {
+	log.Println("🌱 Iniciando proceso completo de seeding...")
+
+	// Ejecutar seeding de datos aleatorios para Santa Cruz
+	if err := s.SeedAllRandom(); err != nil {
+		return fmt.Errorf("error en seeding aleatorio: %w", err)
+	}
+
+	// Mostrar estadísticas
+	if err := s.ShowEnfermedadesStats(); err != nil {
+		return fmt.Errorf("error mostrando estadísticas: %w", err)
+	}
+
+	log.Println("✅ Proceso de seeding completado exitosamente!")
+	return nil
+}
+
+// Estructura para las direcciones de Santa Cruz
+type DireccionSantaCruz struct {
+	Direccion string
+	Latitud   float64
+	Longitud  float64
+	Distrito  string
+	Barrio    string
+}
+
+// Array con 10 direcciones distribuidas por Santa Cruz
+var direccionesSantaCruz = []DireccionSantaCruz{
+	{
+		Direccion: "Av. San Martín 3456, Equipetrol",
+		Latitud:   -17.7712,
+		Longitud:  -63.1723,
+		Distrito:  "Equipetrol",
+		Barrio:    "Equipetrol Norte",
+	},
+	{
+		Direccion: "Radial 10, Km 6.5, Zona Norte",
+		Latitud:   -17.7245,
+		Longitud:  -63.1634,
+		Distrito:  "Norte",
+		Barrio:    "Las Palmas",
+	},
+	{
+		Direccion: "Av. Grigotá 2890, Plan Tres Mil",
+		Latitud:   -17.8156,
+		Longitud:  -63.1547,
+		Distrito:  "Plan Tres Mil",
+		Barrio:    "Plan Tres Mil Centro",
+	},
+	{
+		Direccion: "Calle Junín 876, Centro Histórico",
+		Latitud:   -17.7838,
+		Longitud:  -63.1815,
+		Distrito:  "Centro",
+		Barrio:    "Centro Histórico",
+	},
+	{
+		Direccion: "Av. Alemana 1245, Villa 1ro de Mayo",
+		Latitud:   -17.7623,
+		Longitud:  -63.1654,
+		Distrito:  "Villa 1ro de Mayo",
+		Barrio:    "Villa 1ro de Mayo",
+	},
+	{
+		Direccion: "Av. Banzer Km 8, Zona Norte",
+		Latitud:   -17.7156,
+		Longitud:  -63.1567,
+		Distrito:  "Norte",
+		Barrio:    "Norte",
+	},
+	{
+		Direccion: "Radial 27, Km 4, Zona Sur",
+		Latitud:   -17.8234,
+		Longitud:  -63.1934,
+		Distrito:  "Sur",
+		Barrio:    "Zona Sur",
+	},
+	{
+		Direccion: "Av. Cristo Redentor 567, Zona Oeste",
+		Latitud:   -17.7889,
+		Longitud:  -63.2134,
+		Distrito:  "Oeste",
+		Barrio:    "Pampa de la Isla",
+	},
+	{
+		Direccion: "Doble Vía La Guardia Km 12, Zona Este",
+		Latitud:   -17.7634,
+		Longitud:  -63.1298,
+		Distrito:  "Este",
+		Barrio:    "La Guardia",
+	},
+	{
+		Direccion: "Av. Roca y Coronado 1890, Equipetrol Sur",
+		Latitud:   -17.7856,
+		Longitud:  -63.1698,
+		Distrito:  "Equipetrol",
+		Barrio:    "Equipetrol Sur",
+	},
+}
+
+// Arrays de nombres y apellidos bolivianos
+var nombresMasculinos = []string{
+	"Carlos", "José", "Luis", "Miguel", "Juan", "Roberto", "Fernando", "Eduardo", "Diego", "Antonio",
+	"Alejandro", "Francisco", "Manuel", "Rafael", "Ricardo", "Sergio", "Jorge", "Pedro", "Daniel", "Alberto",
+	"Andrés", "Guillermo", "Mauricio", "Rodrigo", "Javier", "Óscar", "Víctor", "Raúl", "Pablo", "Álvaro",
+	"Gonzalo", "Marcelo", "Rubén", "Sebastián", "Adrián", "Leonardo", "Martín", "Hugo", "Iván", "Cristian",
+	"Nelson", "Wilson", "Ronald", "Ramiro", "Freddy", "Johnny", "Henry", "Jimmy", "Kevin", "Alex",
+}
+
+var nombresFemeninos = []string{
+	"María", "Ana", "Carmen", "Rosa", "Elena", "Patricia", "Claudia", "Silvia", "Verónica", "Mónica",
+	"Gabriela", "Andrea", "Paola", "Vanessa", "Roxana", "Carla", "Daniela", "Alejandra", "Fernanda", "Lucía",
+	"Isabel", "Teresa", "Beatriz", "Esperanza", "Gloria", "Mirian", "Karina", "Lourdes", "Sandra", "Nancy",
+	"Yolanda", "Sonia", "Lidia", "Graciela", "Delia", "Martha", "Julia", "Cristina", "Viviana", "Marcela",
+	"Lorena", "Susana", "Irma", "Nora", "Laura", "Jessica", "Karen", "Evelyn", "Daysi", "Wendy",
+}
+
+var apellidos = []string{
+	"Suárez", "Mendoza", "Gutiérrez", "Rodríguez", "González", "Martínez", "López", "García", "Pérez", "Sánchez",
+	"Rocha", "Terceros", "Peña", "Rivero", "Soliz", "Antelo", "Barbery", "Justiniano", "Vaca", "Diez",
+	"Salvatierra", "Morón", "Ribera", "Landivar", "Saavedra", "Parada", "Burgos", "Cronenbold", "Richter", "Roca",
+	"Aguilar", "Monasterio", "Claure", "Añez", "Pedraza", "Melgar", "Hurtado", "Flores", "Vargas", "Mamani",
+	"Quispe", "Choque", "Condori", "Torrez", "Ramos", "Cruz", "Huanca", "Arroyo", "Marca", "Morales",
+	"Poma", "Silva", "Herrera", "Jiménez", "Castro", "Romero", "Fernández", "Ruiz", "Díaz", "Moreno",
+	"Muñoz", "Álvarez", "Ramírez", "Torres", "Domínguez", "Vásquez", "Ramos", "Gil", "Serrano", "Blanco",
+	"Molina", "Medina", "Guerrero", "Cortés", "Ibáñez", "Campos", "Rubio", "Vega", "Delgado", "Reyes",
+}
+
+var tiposSangre = []string{"O+", "O-", "A+", "A-", "B+", "B-", "AB+", "AB-"}
+
+// Estructura para definir cada enfermedad con sus características específicas
+type EnfermedadInfo struct {
+	Nombre         string
+	MotivoConsulta []string
+	Diagnosticos   []string
+	Tratamientos   []string
+	Medicamentos   []string
+	EsContagiosa   bool
+	Observaciones  []string
+}
+
+// Definición de las 6 enfermedades específicas
+var enfermedadesEspecificas = []EnfermedadInfo{
+	{
+		Nombre: "Dengue",
+		MotivoConsulta: []string{
+			"Fiebre alta y dolor de cabeza intenso",
+			"Dolor muscular y articular severo",
+			"Erupción cutánea y fiebre",
+			"Malestar general y dolor retroocular",
+		},
+		Diagnosticos: []string{
+			"Dengue clásico sin signos de alarma",
+			"Dengue con signos de alarma",
+			"Fiebre dengue típica",
+		},
+		Tratamientos: []string{
+			"Reposo absoluto e hidratación oral",
+			"Control de fiebre y monitoreo de signos vitales",
+			"Hidratación endovenosa si es necesario",
+		},
+		Medicamentos: []string{
+			"Paracetamol 500mg cada 6 horas",
+			"Suero oral abundante",
+			"Paracetamol 1g cada 8 horas (adultos)",
+		},
+		EsContagiosa: true,
+		Observaciones: []string{
+			"Paciente en vigilancia epidemiológica",
+			"Control de plaquetas cada 24 horas",
+			"Notificado a epidemiología departamental",
+			"Familiar orientado sobre signos de alarma",
+		},
+	},
+	{
+		Nombre: "Sarampión",
+		MotivoConsulta: []string{
+			"Erupción cutánea generalizada y fiebre",
+			"Tos, fiebre y manchas en la piel",
+			"Conjuntivitis y erupción maculopapular",
+			"Fiebre alta con exantema característico",
+		},
+		Diagnosticos: []string{
+			"Sarampión confirmado por clínica",
+			"Sarampión típico con exantema",
+			"Sarampión con complicaciones menores",
+		},
+		Tratamientos: []string{
+			"Aislamiento respiratorio y sintomáticos",
+			"Soporte nutricional y vitamina A",
+			"Manejo de complicaciones según evolución",
+		},
+		Medicamentos: []string{
+			"Paracetamol para fiebre",
+			"Vitamina A 200,000 UI dosis única",
+			"Suero fisiológico para hidratación ocular",
+		},
+		EsContagiosa: true,
+		Observaciones: []string{
+			"Caso notificado inmediatamente a epidemiología",
+			"Aislamiento respiratorio estricto",
+			"Investigación epidemiológica de contactos",
+			"Seguimiento por 21 días",
+		},
+	},
+	{
+		Nombre: "Zika",
+		MotivoConsulta: []string{
+			"Erupción cutánea con picazón leve",
+			"Fiebre baja y dolor articular",
+			"Conjuntivitis y exantema",
+			"Dolor de cabeza y malestar general",
+		},
+		Diagnosticos: []string{
+			"Zika virus confirmado",
+			"Síndrome febril compatible con Zika",
+			"Zika con manifestaciones típicas",
+		},
+		Tratamientos: []string{
+			"Reposo y sintomáticos",
+			"Hidratación adecuada",
+			"Antihistamínicos para prurito",
+		},
+		Medicamentos: []string{
+			"Paracetamol 500mg cada 8 horas",
+			"Loratadina 10mg para picazón",
+			"Abundantes líquidos",
+		},
+		EsContagiosa: true,
+		Observaciones: []string{
+			"Orientación sobre prevención de vectores",
+			"Caso notificado a vigilancia epidemiológica",
+			"Seguimiento especial si paciente embarazada",
+			"Control de evolución a los 7 días",
+		},
+	},
+	{
+		Nombre: "Influenza",
+		MotivoConsulta: []string{
+			"Fiebre alta de inicio súbito",
+			"Tos seca y dolor muscular",
+			"Malestar general y cefalea intensa",
+			"Síntomas respiratorios y fiebre",
+		},
+		Diagnosticos: []string{
+			"Influenza A estacional",
+			"Síndrome gripal por Influenza",
+			"Influenza con complicaciones menores",
+		},
+		Tratamientos: []string{
+			"Antivirales si se inicia temprano",
+			"Reposo y sintomáticos",
+			"Hidratación y control de fiebre",
+		},
+		Medicamentos: []string{
+			"Oseltamivir 75mg cada 12 horas por 5 días",
+			"Paracetamol 1g cada 8 horas",
+			"Ibuprofeno 400mg cada 8 horas",
+		},
+		EsContagiosa: true,
+		Observaciones: []string{
+			"Aislamiento respiratorio por 7 días",
+			"Vigilancia de complicaciones respiratorias",
+			"Orientación sobre medidas preventivas",
+			"Control si no mejora en 72 horas",
+		},
+	},
+	{
+		Nombre: "Gripe AH1N1",
+		MotivoConsulta: []string{
+			"Fiebre alta y dificultad respiratoria",
+			"Tos persistente y malestar severo",
+			"Síntomas gripales intensos",
+			"Fiebre, tos y dolor muscular intenso",
+		},
+		Diagnosticos: []string{
+			"Influenza AH1N1 confirmada",
+			"Gripe AH1N1 con síntomas respiratorios",
+			"Influenza pandémica AH1N1",
+		},
+		Tratamientos: []string{
+			"Oseltamivir inmediato",
+			"Aislamiento y monitoreo respiratorio",
+			"Soporte ventilatorio si es necesario",
+		},
+		Medicamentos: []string{
+			"Oseltamivir 75mg cada 12 horas por 5 días",
+			"Paracetamol para control de fiebre",
+			"Broncodilatadores si hay broncoespasmo",
+		},
+		EsContagiosa: true,
+		Observaciones: []string{
+			"Notificación inmediata obligatoria",
+			"Aislamiento estricto por 7-10 días",
+			"Monitoreo de saturación de oxígeno",
+			"Seguimiento evolutivo diario",
+		},
+	},
+	{
+		Nombre: "Bronquitis",
+		MotivoConsulta: []string{
+			"Tos persistente con expectoración",
+			"Dificultad respiratoria y tos",
+			"Tos con flemas y malestar",
+			"Dolor torácico y tos productiva",
+		},
+		Diagnosticos: []string{
+			"Bronquitis aguda viral",
+			"Bronquitis bacteriana",
+			"Bronquitis con componente alérgico",
+		},
+		Tratamientos: []string{
+			"Broncodilatadores y expectorantes",
+			"Antibióticos si hay sobreinfección",
+			"Fisioterapia respiratoria",
+		},
+		Medicamentos: []string{
+			"Salbutamol inhalador cada 6 horas",
+			"Ambroxol 30mg cada 8 horas",
+			"Amoxicilina 500mg cada 8 horas si bacteriana",
+		},
+		EsContagiosa: false,
+		Observaciones: []string{
+			"Evitar irritantes respiratorios",
+			"Hidratación abundante",
+			"Control en 7 días si no mejora",
+			"Educación sobre factores desencadenantes",
+		},
+	},
+}
+
+// SeedHospitalesSantaCruz inserta datos de hospitales de Santa Cruz de la Sierra
+func (s *Seeder) SeedHospitalesSantaCruz() error {
+	log.Println("🏥 Seeding hospitales de Santa Cruz de la Sierra...")
 
 	// Hashear contraseñas
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte("admin123"), bcrypt.DefaultCost)
@@ -89,43 +403,153 @@ func (s *Seeder) SeedHospitales() error {
 
 	hospitales := []models.Hospital{
 		{
-			Nombre:    "Hospital Central de La Paz",
-			Direccion: "Av. Saavedra 2302, Miraflores",
-			Ciudad:    "La Paz",
-			Telefono:  "+591-2-2651100",
-			Email:     "admin@hospitalcentral.com",
+			Nombre:    "Hospital Universitario Japonés",
+			Direccion: "Av. Japón s/n, 3er Anillo Externo",
+			Latitud:   -17.7833,
+			Longitud:  -63.1821,
+			Ciudad:    "Santa Cruz de la Sierra",
+			Telefono:  "+591-3-3460101",
+			Email:     "admin@huj.org.bo",
 			Password:  string(hashedPassword),
 		},
 		{
-			Nombre:    "Hospital del Niño Dr. Ovidio Aliaga Uría",
-			Direccion: "Av. Simón Bolívar 1800, Miraflores",
-			Ciudad:    "La Paz",
-			Telefono:  "+591-2-2456789",
-			Email:     "admin@hospitalnino.com",
+			Nombre:    "Hospital de Niños Dr. Mario Ortiz Suárez",
+			Direccion: "Calle René Moreno 171, Centro",
+			Latitud:   -17.7838,
+			Longitud:  -63.1815,
+			Ciudad:    "Santa Cruz de la Sierra",
+			Telefono:  "+591-3-3346969",
+			Email:     "admin@hospitalninos.gob.bo",
 			Password:  string(hashedPassword),
 		},
 		{
-			Nombre:    "Hospital de Clínicas",
-			Direccion: "Av. Saavedra 2302, Sopocachi",
-			Ciudad:    "La Paz",
-			Telefono:  "+591-2-2459080",
-			Email:     "admin@hospitalclinicas.com",
+			Nombre:    "Hospital San Juan de Dios",
+			Direccion: "Calle Junín 1248, Centro",
+			Latitud:   -17.7847,
+			Longitud:  -63.1812,
+			Ciudad:    "Santa Cruz de la Sierra",
+			Telefono:  "+591-3-3342777",
+			Email:     "admin@hospitalsanjuan.org.bo",
 			Password:  string(hashedPassword),
 		},
 		{
-			Nombre:    "Hospital San Gabriel",
-			Direccion: "Calle Capitán Ravelo 2048, San Pedro",
-			Ciudad:    "La Paz",
-			Telefono:  "+591-2-2401122",
-			Email:     "admin@hospitalsangabriel.com",
+			Nombre:    "Hospital Percy Boland",
+			Direccion: "Av. Santos Dumont 2do Anillo",
+			Latitud:   -17.7756,
+			Longitud:  -63.1789,
+			Ciudad:    "Santa Cruz de la Sierra",
+			Telefono:  "+591-3-3462031",
+			Email:     "admin@percyboland.com",
 			Password:  string(hashedPassword),
 		},
 		{
-			Nombre:    "Hospital Arco Iris",
-			Direccion: "Av. 6 de Agosto 2821, San Miguel",
-			Ciudad:    "La Paz",
-			Telefono:  "+591-2-2431234",
-			Email:     "admin@hospitalarcoiris.com",
+			Nombre:    "Hospital Santa Cruz",
+			Direccion: "Av. Irala 468, Centro",
+			Latitud:   -17.7842,
+			Longitud:  -63.1808,
+			Ciudad:    "Santa Cruz de la Sierra",
+			Telefono:  "+591-3-3361616",
+			Email:     "admin@hospitalsantacruz.com",
+			Password:  string(hashedPassword),
+		},
+		{
+			Nombre:    "Hospital Municipal Francés",
+			Direccion: "Av. Grigotá 1946, Plan Tres Mil",
+			Latitud:   -17.8156,
+			Longitud:  -63.1547,
+			Ciudad:    "Santa Cruz de la Sierra",
+			Telefono:  "+591-3-3480200",
+			Email:     "admin@hospitalfrances.gob.bo",
+			Password:  string(hashedPassword),
+		},
+		{
+			Nombre:    "Hospital del Norte",
+			Direccion: "Av. Banzer 6to Anillo, Zona Norte",
+			Latitud:   -17.7245,
+			Longitud:  -63.1634,
+			Ciudad:    "Santa Cruz de la Sierra",
+			Telefono:  "+591-3-3555100",
+			Email:     "admin@hospitalnorte.com.bo",
+			Password:  string(hashedPassword),
+		},
+		{
+			Nombre:    "Clínica Foianini",
+			Direccion: "Av. Alemana 6to Anillo",
+			Latitud:   -17.7567,
+			Longitud:  -63.1678,
+			Ciudad:    "Santa Cruz de la Sierra",
+			Telefono:  "+591-3-3462100",
+			Email:     "admin@foianini.org",
+			Password:  string(hashedPassword),
+		},
+		{
+			Nombre:    "Hospital La Católica",
+			Direccion: "Calle Cristóbal de Mendoza 297, Centro",
+			Latitud:   -17.7851,
+			Longitud:  -63.1818,
+			Ciudad:    "Santa Cruz de la Sierra",
+			Telefono:  "+591-3-3336633",
+			Email:     "admin@lacatolica.com.bo",
+			Password:  string(hashedPassword),
+		},
+		{
+			Nombre:    "Hospital San Antonio",
+			Direccion: "Calle Warnes 726, Centro",
+			Latitud:   -17.7835,
+			Longitud:  -63.1823,
+			Ciudad:    "Santa Cruz de la Sierra",
+			Telefono:  "+591-3-3348080",
+			Email:     "admin@hospitalsanantonio.com",
+			Password:  string(hashedPassword),
+		},
+		{
+			Nombre:    "Hospital de la Mujer Dr. Percy Boland",
+			Direccion: "Av. Alemana 341, Villa 1ro de Mayo",
+			Latitud:   -17.7623,
+			Longitud:  -63.1654,
+			Ciudad:    "Santa Cruz de la Sierra",
+			Telefono:  "+591-3-3462800",
+			Email:     "admin@hospitaldelamujer.gob.bo",
+			Password:  string(hashedPassword),
+		},
+		{
+			Nombre:    "Hospital General San Juan de Dios",
+			Direccion: "Barrio San Juan, Villa 1ro de Mayo",
+			Latitud:   -17.7634,
+			Longitud:  -63.1598,
+			Ciudad:    "Santa Cruz de la Sierra",
+			Telefono:  "+591-3-3480300",
+			Email:     "admin@hospitalgeneralsanjuan.gob.bo",
+			Password:  string(hashedPassword),
+		},
+		{
+			Nombre:    "Clínica Los Tajibos",
+			Direccion: "Av. San Martín 7mo Anillo",
+			Latitud:   -17.7456,
+			Longitud:  -63.1789,
+			Ciudad:    "Santa Cruz de la Sierra",
+			Telefono:  "+591-3-3444000",
+			Email:     "admin@lostajibos.com",
+			Password:  string(hashedPassword),
+		},
+		{
+			Nombre:    "Hospital Corazón de Jesús",
+			Direccion: "Calle Beni 738, Centro",
+			Latitud:   -17.7849,
+			Longitud:  -63.1814,
+			Ciudad:    "Santa Cruz de la Sierra",
+			Telefono:  "+591-3-3337700",
+			Email:     "admin@corazondejesus.org.bo",
+			Password:  string(hashedPassword),
+		},
+		{
+			Nombre:    "Hospital Evangélico Boliviano",
+			Direccion: "Av. 6 de Agosto 1234, Equipetrol",
+			Latitud:   -17.7712,
+			Longitud:  -63.1723,
+			Ciudad:    "Santa Cruz de la Sierra",
+			Telefono:  "+591-3-3331500",
+			Email:     "admin@hospitalevangélico.org.bo",
 			Password:  string(hashedPassword),
 		},
 	}
@@ -142,165 +566,79 @@ func (s *Seeder) SeedHospitales() error {
 			}
 			log.Printf("✅ Hospital creado: %s", hospital.Nombre)
 		} else {
-			log.Printf("⚠️  Hospital ya existe: %s", hospital.Nombre)
+			log.Printf("⚠  Hospital ya existe: %s", hospital.Nombre)
 		}
 	}
 
 	return nil
 }
 
-// SeedPacientes inserta datos de pacientes
-func (s *Seeder) SeedPacientes() error {
-	log.Println("👥 Seeding pacientes...")
+// SeedRandomPacientes genera 500 pacientes aleatorios
+func (s *Seeder) SeedRandomPacientes() error {
+	log.Println("👥 Generando 500 pacientes aleatorios...")
 
-	pacientes := []models.Paciente{
-		{
-			Nombre:          "Juan Carlos Mendoza",
-			FechaNacimiento: time.Date(1985, 3, 15, 0, 0, 0, 0, time.UTC),
-			Sexo:            "M",
-			TipoSangre:      "O+",
-			PesoKg:          75.5,
-			AlturaCm:        175,
-		},
-		{
-			Nombre:          "María Elena Quispe",
-			FechaNacimiento: time.Date(1992, 7, 22, 0, 0, 0, 0, time.UTC),
-			Sexo:            "F",
-			TipoSangre:      "A+",
-			PesoKg:          62.3,
-			AlturaCm:        160,
-		},
-		{
-			Nombre:          "Carlos Alberto Mamani",
-			FechaNacimiento: time.Date(1978, 11, 8, 0, 0, 0, 0, time.UTC),
-			Sexo:            "M",
-			TipoSangre:      "B+",
-			PesoKg:          82.1,
-			AlturaCm:        180,
-		},
-		{
-			Nombre:          "Ana Lucía Vargas",
-			FechaNacimiento: time.Date(1995, 1, 30, 0, 0, 0, 0, time.UTC),
-			Sexo:            "F",
-			TipoSangre:      "AB+",
-			PesoKg:          58.7,
-			AlturaCm:        165,
-		},
-		{
-			Nombre:          "Pedro Antonio Choque",
-			FechaNacimiento: time.Date(1967, 9, 14, 0, 0, 0, 0, time.UTC),
-			Sexo:            "M",
-			TipoSangre:      "O-",
-			PesoKg:          78.9,
-			AlturaCm:        172,
-		},
-		{
-			Nombre:          "Rosa Elena Condori",
-			FechaNacimiento: time.Date(1988, 4, 12, 0, 0, 0, 0, time.UTC),
-			Sexo:            "F",
-			TipoSangre:      "A-",
-			PesoKg:          65.2,
-			AlturaCm:        158,
-		},
-		{
-			Nombre:          "Miguel Ángel Torrez",
-			FechaNacimiento: time.Date(1982, 6, 25, 0, 0, 0, 0, time.UTC),
-			Sexo:            "M",
-			TipoSangre:      "B-",
-			PesoKg:          71.4,
-			AlturaCm:        177,
-		},
-		{
-			Nombre:          "Claudia Patricia Flores",
-			FechaNacimiento: time.Date(1990, 12, 3, 0, 0, 0, 0, time.UTC),
-			Sexo:            "F",
-			TipoSangre:      "AB-",
-			PesoKg:          59.8,
-			AlturaCm:        162,
-		},
-		{
-			Nombre:          "Luis Fernando Ramos",
-			FechaNacimiento: time.Date(1975, 8, 17, 0, 0, 0, 0, time.UTC),
-			Sexo:            "M",
-			TipoSangre:      "O+",
-			PesoKg:          85.3,
-			AlturaCm:        183,
-		},
-		{
-			Nombre:          "Silvia Mónica Cruz",
-			FechaNacimiento: time.Date(1993, 5, 9, 0, 0, 0, 0, time.UTC),
-			Sexo:            "F",
-			TipoSangre:      "A+",
-			PesoKg:          63.7,
-			AlturaCm:        167,
-		},
-		{
-			Nombre:          "Roberto Inca Huanca",
-			FechaNacimiento: time.Date(1980, 10, 21, 0, 0, 0, 0, time.UTC),
-			Sexo:            "M",
-			TipoSangre:      "B+",
-			PesoKg:          79.6,
-			AlturaCm:        174,
-		},
-		{
-			Nombre:          "Patricia Luz Arroyo",
-			FechaNacimiento: time.Date(1987, 2, 28, 0, 0, 0, 0, time.UTC),
-			Sexo:            "F",
-			TipoSangre:      "O-",
-			PesoKg:          61.9,
-			AlturaCm:        159,
-		},
-		{
-			Nombre:          "Fernando José Marca",
-			FechaNacimiento: time.Date(1972, 12, 7, 0, 0, 0, 0, time.UTC),
-			Sexo:            "M",
-			TipoSangre:      "A-",
-			PesoKg:          73.8,
-			AlturaCm:        176,
-		},
-		{
-			Nombre:          "Verónica Isabel Morales",
-			FechaNacimiento: time.Date(1991, 9, 16, 0, 0, 0, 0, time.UTC),
-			Sexo:            "F",
-			TipoSangre:      "AB+",
-			PesoKg:          56.4,
-			AlturaCm:        163,
-		},
-		{
-			Nombre:          "Diego Alejandro Poma",
-			FechaNacimiento: time.Date(1984, 1, 11, 0, 0, 0, 0, time.UTC),
-			Sexo:            "M",
-			TipoSangre:      "B-",
-			PesoKg:          81.2,
-			AlturaCm:        179,
-		},
-	}
+	// Inicializar generador de números aleatorios
+	rand.Seed(time.Now().UnixNano())
 
-	for _, paciente := range pacientes {
-		// Verificar si ya existe
+	for i := 0; i < 500; i++ {
+		// Generar sexo aleatorio
+		sexo := "M"
+		var nombre string
+		if rand.Intn(2) == 0 {
+			sexo = "F"
+			nombre = nombresFemeninos[rand.Intn(len(nombresFemeninos))]
+		} else {
+			nombre = nombresMasculinos[rand.Intn(len(nombresMasculinos))]
+		}
+
+		// Generar nombre completo
+		apellido1 := apellidos[rand.Intn(len(apellidos))]
+		apellido2 := apellidos[rand.Intn(len(apellidos))]
+		nombreCompleto := fmt.Sprintf("%s %s %s", nombre, apellido1, apellido2)
+
+		// Generar fecha de nacimiento (entre 1950 y 2020)
+		añoNacimiento := 1950 + rand.Intn(70)
+		mesNacimiento := 1 + rand.Intn(12)
+		diaNacimiento := 1 + rand.Intn(28)
+		fechaNacimiento := time.Date(añoNacimiento, time.Month(mesNacimiento), diaNacimiento, 0, 0, 0, 0, time.UTC)
+
+		// Generar datos físicos aleatorios
+		peso := 45.0 + rand.Float64()*55.0 // Entre 45 y 100 kg
+		altura := 150 + rand.Intn(50)      // Entre 150 y 200 cm
+		tipoSangre := tiposSangre[rand.Intn(len(tiposSangre))]
+
+		paciente := models.Paciente{
+			Nombre:          nombreCompleto,
+			FechaNacimiento: fechaNacimiento,
+			Sexo:            sexo,
+			TipoSangre:      tipoSangre,
+			PesoKg:          float64(int(peso*10)) / 10, // Redondear a 1 decimal
+			AlturaCm:        altura,
+		}
+
+		// Verificar si ya existe (muy improbable con nombres aleatorios)
 		var existingPaciente models.Paciente
-		result := s.db.Where("nombre = ? AND fecha_nacimiento = ?",
-			paciente.Nombre, paciente.FechaNacimiento).First(&existingPaciente)
+		result := s.db.Where("nombre = ?", paciente.Nombre).First(&existingPaciente)
 
 		if result.Error != nil && result.Error == gorm.ErrRecordNotFound {
-			// No existe, crear nuevo
 			if err := s.db.Create(&paciente).Error; err != nil {
 				return err
 			}
-			log.Printf("✅ Paciente creado: %s", paciente.Nombre)
-		} else {
-			log.Printf("⚠️  Paciente ya existe: %s", paciente.Nombre)
+			if (i+1)%50 == 0 {
+				log.Printf("✅ Creados %d pacientes...", i+1)
+			}
 		}
 	}
 
+	log.Println("✅ 500 pacientes aleatorios creados exitosamente!")
 	return nil
 }
 
-// SeedHistorialesClinico inserta datos de historiales clínicos
-func (s *Seeder) SeedHistorialesClinico() error {
-	log.Println("📋 Seeding historiales clínicos...")
+// SeedRandomHistoriales genera 100 historiales clínicos aleatorios
+func (s *Seeder) SeedRandomHistoriales() error {
+	log.Println("📋 Generando 100 historiales clínicos aleatorios...")
 
-	// Obtener algunos IDs existentes de hospitales y pacientes
+	// Obtener IDs de hospitales y pacientes existentes
 	var hospitales []models.Hospital
 	if err := s.db.Find(&hospitales).Error; err != nil {
 		return err
@@ -312,294 +650,133 @@ func (s *Seeder) SeedHistorialesClinico() error {
 	}
 
 	if len(hospitales) == 0 || len(pacientes) == 0 {
-		log.Println("⚠️  No hay hospitales o pacientes para crear historiales")
-		return nil
+		return fmt.Errorf("no hay hospitales o pacientes suficientes para crear historiales")
 	}
 
-	// Datos de historiales clínicos con coordenadas reales de La Paz
-	historialesData := []struct {
-		IDPaciente          uint
-		IDHospital          uint
-		FechaIngreso        time.Time
-		MotivoConsulta      string
-		Diagnostico         string
-		Tratamiento         string
-		Medicamentos        string
-		Observaciones       string
-		PatientLatitude     float64
-		PatientLongitude    float64
-		PatientAddress      string
-		PatientDistrict     string
-		PatientNeighborhood string
-		ConsultationDate    time.Time
-		SymptomsStartDate   *time.Time
-		IsContagious        bool
-	}{
-		{
-			IDPaciente:          1,
-			IDHospital:          1,
-			FechaIngreso:        time.Now().AddDate(0, 0, -5),
-			MotivoConsulta:      "Dolor de cabeza intenso y fiebre",
-			Diagnostico:         "Migraña tensional",
-			Tratamiento:         "Reposo y analgésicos",
-			Medicamentos:        "Ibuprofeno 400mg cada 8 horas",
-			Observaciones:       "Paciente estable, mejora progresiva",
-			PatientLatitude:     -16.5000,
-			PatientLongitude:    -68.1193,
-			PatientAddress:      "Av. El Prado 1425, Centro",
-			PatientDistrict:     "Centro",
-			PatientNeighborhood: "El Prado",
-			ConsultationDate:    time.Now().AddDate(0, 0, -5),
-			SymptomsStartDate:   timePtr(time.Now().AddDate(0, 0, -7)),
-			IsContagious:        false,
-		},
-		{
-			IDPaciente:          2,
-			IDHospital:          1,
-			FechaIngreso:        time.Now().AddDate(0, 0, -3),
-			MotivoConsulta:      "Tos persistente y dificultad respiratoria",
-			Diagnostico:         "Bronquitis aguda",
-			Tratamiento:         "Broncodilatadores y antibióticos",
-			Medicamentos:        "Salbutamol, Amoxicilina 500mg",
-			Observaciones:       "Evolución favorable, control en 7 días",
-			PatientLatitude:     -16.5097,
-			PatientLongitude:    -68.1192,
-			PatientAddress:      "Calle Sagárnaga 318, Centro",
-			PatientDistrict:     "Centro",
-			PatientNeighborhood: "Rosario",
-			ConsultationDate:    time.Now().AddDate(0, 0, -3),
-			SymptomsStartDate:   timePtr(time.Now().AddDate(0, 0, -5)),
-			IsContagious:        true,
-		},
-		{
-			IDPaciente:          3,
-			IDHospital:          2,
-			FechaIngreso:        time.Now().AddDate(0, 0, -10),
-			MotivoConsulta:      "Dolor abdominal severo",
-			Diagnostico:         "Gastritis aguda",
-			Tratamiento:         "Dieta blanda y protectores gástricos",
-			Medicamentos:        "Omeprazol 20mg, Sucralfato",
-			Observaciones:       "Paciente en ayunas, mejora notable",
-			PatientLatitude:     -16.5322,
-			PatientLongitude:    -68.0753,
-			PatientAddress:      "Av. 6 de Agosto 2420, San Miguel",
-			PatientDistrict:     "San Miguel",
-			PatientNeighborhood: "Villa Fátima",
-			ConsultationDate:    time.Now().AddDate(0, 0, -10),
-			SymptomsStartDate:   timePtr(time.Now().AddDate(0, 0, -12)),
-			IsContagious:        false,
-		},
-		{
-			IDPaciente:          4,
-			IDHospital:          2,
-			FechaIngreso:        time.Now().AddDate(0, 0, -8),
-			MotivoConsulta:      "Erupción cutánea y picazón",
-			Diagnostico:         "Dermatitis alérgica",
-			Tratamiento:         "Antihistamínicos y corticoides tópicos",
-			Medicamentos:        "Loratadina 10mg, Betametasona crema",
-			Observaciones:       "Reacción alérgica a alimento, mejoría evidente",
-			PatientLatitude:     -16.5203,
-			PatientLongitude:    -68.1127,
-			PatientAddress:      "Av. Saavedra 1950, Sopocachi",
-			PatientDistrict:     "Sopocachi",
-			PatientNeighborhood: "Sopocachi",
-			ConsultationDate:    time.Now().AddDate(0, 0, -8),
-			SymptomsStartDate:   timePtr(time.Now().AddDate(0, 0, -9)),
-			IsContagious:        false,
-		},
-		{
-			IDPaciente:          5,
-			IDHospital:          3,
-			FechaIngreso:        time.Now().AddDate(0, 0, -15),
-			MotivoConsulta:      "Fiebre alta y malestar general",
-			Diagnostico:         "Síndrome gripal",
-			Tratamiento:         "Reposo absoluto y sintomáticos",
-			Medicamentos:        "Paracetamol 500mg, abundantes líquidos",
-			Observaciones:       "Cuadro viral, evolución satisfactoria",
-			PatientLatitude:     -16.4955,
-			PatientLongitude:    -68.1336,
-			PatientAddress:      "Calle 21 de Calacoto 1234, Calacoto",
-			PatientDistrict:     "Calacoto",
-			PatientNeighborhood: "Calacoto",
-			ConsultationDate:    time.Now().AddDate(0, 0, -15),
-			SymptomsStartDate:   timePtr(time.Now().AddDate(0, 0, -17)),
-			IsContagious:        true,
-		},
-		{
-			IDPaciente:          6,
-			IDHospital:          3,
-			FechaIngreso:        time.Now().AddDate(0, 0, -2),
-			MotivoConsulta:      "Lesión en tobillo por caída",
-			Diagnostico:         "Esguince de tobillo grado II",
-			Tratamiento:         "Inmovilización y fisioterapia",
-			Medicamentos:        "Diclofenaco 50mg, hielo local",
-			Observaciones:       "Inflamación moderada, pronóstico favorable",
-			PatientLatitude:     -16.5408,
-			PatientLongitude:    -68.0619,
-			PatientAddress:      "Av. Costanera s/n, Achachicala",
-			PatientDistrict:     "Max Paredes",
-			PatientNeighborhood: "Achachicala",
-			ConsultationDate:    time.Now().AddDate(0, 0, -2),
-			SymptomsStartDate:   timePtr(time.Now().AddDate(0, 0, -2)),
-			IsContagious:        false,
-		},
-		{
-			IDPaciente:          7,
-			IDHospital:          4,
-			FechaIngreso:        time.Now().AddDate(0, 0, -6),
-			MotivoConsulta:      "Conjuntivitis bilateral",
-			Diagnostico:         "Conjuntivitis viral",
-			Tratamiento:         "Lágrimas artificiales y compresas frías",
-			Medicamentos:        "Tobramicina gotas oftálmicas",
-			Observaciones:       "Proceso viral autolimitado, buena evolución",
-			PatientLatitude:     -16.4894,
-			PatientLongitude:    -68.1317,
-			PatientAddress:      "Calle 10 de Obrajes 890, Obrajes",
-			PatientDistrict:     "Obrajes",
-			PatientNeighborhood: "Obrajes",
-			ConsultationDate:    time.Now().AddDate(0, 0, -6),
-			SymptomsStartDate:   timePtr(time.Now().AddDate(0, 0, -8)),
-			IsContagious:        true,
-		},
-		{
-			IDPaciente:          8,
-			IDHospital:          4,
-			FechaIngreso:        time.Now().AddDate(0, 0, -12),
-			MotivoConsulta:      "Hipertensión arterial descontrolada",
-			Diagnostico:         "Crisis hipertensiva",
-			Tratamiento:         "Control estricto y ajuste de medicación",
-			Medicamentos:        "Enalapril 10mg, Amlodipino 5mg",
-			Observaciones:       "Presión controlada, seguimiento ambulatorio",
-			PatientLatitude:     -16.5189,
-			PatientLongitude:    -68.0888,
-			PatientAddress:      "Av. Buenos Aires 1567, Miraflores",
-			PatientDistrict:     "Miraflores",
-			PatientNeighborhood: "Miraflores",
-			ConsultationDate:    time.Now().AddDate(0, 0, -12),
-			SymptomsStartDate:   timePtr(time.Now().AddDate(0, 0, -14)),
-			IsContagious:        false,
-		},
-		{
-			IDPaciente:          9,
-			IDHospital:          5,
-			FechaIngreso:        time.Now().AddDate(0, 0, -1),
-			MotivoConsulta:      "Gastroenteritis aguda",
-			Diagnostico:         "Gastroenteritis viral",
-			Tratamiento:         "Hidratación oral y dieta astringente",
-			Medicamentos:        "Suero oral, Loperamida 2mg",
-			Observaciones:       "Deshidratación leve, recuperación rápida",
-			PatientLatitude:     -16.5075,
-			PatientLongitude:    -68.1064,
-			PatientAddress:      "Calle Landaeta 754, San Pedro",
-			PatientDistrict:     "San Pedro",
-			PatientNeighborhood: "San Pedro",
-			ConsultationDate:    time.Now().AddDate(0, 0, -1),
-			SymptomsStartDate:   timePtr(time.Now().AddDate(0, 0, -2)),
-			IsContagious:        true,
-		},
-		{
-			IDPaciente:          10,
-			IDHospital:          5,
-			FechaIngreso:        time.Now().AddDate(0, 0, -20),
-			MotivoConsulta:      "Control prenatal rutinario",
-			Diagnostico:         "Embarazo de 28 semanas normal",
-			Tratamiento:         "Continuación de vitaminas prenatales",
-			Medicamentos:        "Ácido fólico 5mg, Sulfato ferroso",
-			Observaciones:       "Evolución normal del embarazo, próximo control en 4 semanas",
-			PatientLatitude:     -16.4973,
-			PatientLongitude:    -68.1245,
-			PatientAddress:      "Av. Arce 2450, San Jorge",
-			PatientDistrict:     "San Jorge",
-			PatientNeighborhood: "San Jorge",
-			ConsultationDate:    time.Now().AddDate(0, 0, -20),
-			SymptomsStartDate:   nil,
-			IsContagious:        false,
-		},
-		// Casos contagiosos adicionales para estadísticas epidemiológicas
-		{
-			IDPaciente:          11,
-			IDHospital:          1,
-			FechaIngreso:        time.Now().AddDate(0, 0, -4),
-			MotivoConsulta:      "Síntomas de COVID-19",
-			Diagnostico:         "COVID-19 leve",
-			Tratamiento:         "Aislamiento domiciliario y sintomáticos",
-			Medicamentos:        "Paracetamol, Ibuprofeno, Vitamina D",
-			Observaciones:       "Caso confirmado por PCR, contactos rastreados",
-			PatientLatitude:     -16.5245,
-			PatientLongitude:    -68.0516,
-			PatientAddress:      "Calle Final Landaeta 123, Villa San Antonio",
-			PatientDistrict:     "Villa San Antonio",
-			PatientNeighborhood: "Villa San Antonio",
-			ConsultationDate:    time.Now().AddDate(0, 0, -4),
-			SymptomsStartDate:   timePtr(time.Now().AddDate(0, 0, -6)),
-			IsContagious:        true,
-		},
-		{
-			IDPaciente:          12,
-			IDHospital:          2,
-			FechaIngreso:        time.Now().AddDate(0, 0, -7),
-			MotivoConsulta:      "Diarrea y vómitos persistentes",
-			Diagnostico:         "Intoxicación alimentaria",
-			Tratamiento:         "Hidratación endovenosa",
-			Medicamentos:        "Suero fisiológico, Metoclopramida",
-			Observaciones:       "Posible brote familiar, notificado a epidemiología",
-			PatientLatitude:     -16.4856,
-			PatientLongitude:    -68.1589,
-			PatientAddress:      "Av. Hernando Siles 5890, Zona Sur",
-			PatientDistrict:     "Zona Sur",
-			PatientNeighborhood: "La Florida",
-			ConsultationDate:    time.Now().AddDate(0, 0, -7),
-			SymptomsStartDate:   timePtr(time.Now().AddDate(0, 0, -8)),
-			IsContagious:        true,
-		},
-	}
+	// Inicializar generador
+	rand.Seed(time.Now().UnixNano())
 
-	for i, historialData := range historialesData {
-		// Verificar que existan los IDs de paciente y hospital
-		if int(historialData.IDPaciente) > len(pacientes) || int(historialData.IDHospital) > len(hospitales) {
-			log.Printf("⚠️  Saltando historial %d: IDs inválidos", i+1)
-			continue
-		}
+	for i := 0; i < 100; i++ {
+		// Seleccionar paciente y hospital aleatorios
+		paciente := pacientes[rand.Intn(len(pacientes))]
+		hospital := hospitales[rand.Intn(len(hospitales))]
+
+		// Seleccionar dirección aleatoria
+		direccion := direccionesSantaCruz[rand.Intn(len(direccionesSantaCruz))]
+
+		// Generar fecha de ingreso aleatoria (últimos 30 días)
+		diasAtras := rand.Intn(30) + 1
+		fechaIngreso := time.Now().AddDate(0, 0, -diasAtras)
+		fechaConsulta := fechaIngreso
+
+		// Fecha de inicio de síntomas (1-5 días antes de la consulta)
+		diasSintomas := rand.Intn(5) + 1
+		fechaSintomas := fechaConsulta.AddDate(0, 0, -diasSintomas)
+
+		// Seleccionar enfermedad aleatoria de las 6 específicas
+		enfermedadInfo := enfermedadesEspecificas[rand.Intn(len(enfermedadesEspecificas))]
+
+		// Seleccionar datos específicos de la enfermedad
+		motivoConsulta := enfermedadInfo.MotivoConsulta[rand.Intn(len(enfermedadInfo.MotivoConsulta))]
+		diagnostico := enfermedadInfo.Diagnosticos[rand.Intn(len(enfermedadInfo.Diagnosticos))]
+		tratamiento := enfermedadInfo.Tratamientos[rand.Intn(len(enfermedadInfo.Tratamientos))]
+		medicamento := enfermedadInfo.Medicamentos[rand.Intn(len(enfermedadInfo.Medicamentos))]
+		observacion := enfermedadInfo.Observaciones[rand.Intn(len(enfermedadInfo.Observaciones))]
+
+		// La contagiosidad depende de la enfermedad
+		esContagioso := enfermedadInfo.EsContagiosa
 
 		historial := models.HistorialClinico{
-			IDPaciente:          historialData.IDPaciente,
-			IDHospital:          historialData.IDHospital,
-			FechaIngreso:        historialData.FechaIngreso,
-			MotivoConsulta:      historialData.MotivoConsulta,
-			Diagnostico:         historialData.Diagnostico,
-			Tratamiento:         historialData.Tratamiento,
-			Medicamentos:        historialData.Medicamentos,
-			Observaciones:       historialData.Observaciones,
-			PatientLatitude:     historialData.PatientLatitude,
-			PatientLongitude:    historialData.PatientLongitude,
-			PatientAddress:      historialData.PatientAddress,
-			PatientDistrict:     historialData.PatientDistrict,
-			PatientNeighborhood: historialData.PatientNeighborhood,
-			ConsultationDate:    historialData.ConsultationDate,
-			SymptomsStartDate:   historialData.SymptomsStartDate,
-			IsContagious:        historialData.IsContagious,
+			IDPaciente:          paciente.ID,
+			IDHospital:          hospital.ID,
+			FechaIngreso:        fechaIngreso,
+			MotivoConsulta:      motivoConsulta,
+			Enfermedad:          enfermedadInfo.Nombre,
+			Diagnostico:         diagnostico,
+			Tratamiento:         tratamiento,
+			Medicamentos:        medicamento,
+			Observaciones:       observacion,
+			PatientLatitude:     direccion.Latitud,
+			PatientLongitude:    direccion.Longitud,
+			PatientAddress:      direccion.Direccion,
+			PatientDistrict:     direccion.Distrito,
+			PatientNeighborhood: direccion.Barrio,
+			ConsultationDate:    fechaConsulta,
+			SymptomsStartDate:   &fechaSintomas,
+			IsContagious:        esContagioso,
 		}
 
-		// Verificar si ya existe un historial similar
-		var existingHistorial models.HistorialClinico
-		result := s.db.Where("id_paciente = ? AND id_hospital = ? AND fecha_ingreso = ?",
-			historial.IDPaciente, historial.IDHospital, historial.FechaIngreso).First(&existingHistorial)
+		if err := s.db.Create(&historial).Error; err != nil {
+			return err
+		}
 
-		if result.Error != nil && result.Error == gorm.ErrRecordNotFound {
-			// No existe, crear nuevo
-			if err := s.db.Create(&historial).Error; err != nil {
-				return err
-			}
-			log.Printf("✅ Historial clínico creado: Paciente %d - %s", historial.IDPaciente, historial.MotivoConsulta)
-		} else {
-			log.Printf("⚠️  Historial ya existe: Paciente %d", historial.IDPaciente)
+		if (i+1)%20 == 0 {
+			log.Printf("✅ Creados %d historiales...", i+1)
 		}
 	}
 
+	log.Println("✅ 100 historiales clínicos aleatorios creados exitosamente!")
 	return nil
 }
 
-// timePtr es una función helper para crear punteros a time.Time
-func timePtr(t time.Time) *time.Time {
-	return &t
+// SeedAllRandom ejecuta la generación de datos aleatorios
+func (s *Seeder) SeedAllRandom() error {
+	log.Println("🌱 Iniciando generación de datos aleatorios para Santa Cruz...")
+
+	// Primero sembrar hospitales si no existen
+	if err := s.SeedHospitalesSantaCruz(); err != nil {
+		return err
+	}
+
+	// Generar pacientes aleatorios
+	if err := s.SeedRandomPacientes(); err != nil {
+		return err
+	}
+
+	// Generar historiales aleatorios
+	if err := s.SeedRandomHistoriales(); err != nil {
+		return err
+	}
+
+	log.Println("✅ Generación de datos aleatorios completada!")
+	return nil
+}
+
+// ShowEnfermedadesStats muestra estadísticas de las enfermedades generadas
+func (s *Seeder) ShowEnfermedadesStats() error {
+	log.Println("📊 Estadísticas de enfermedades generadas:")
+
+	for _, enfermedad := range enfermedadesEspecificas {
+		var count int64
+		if err := s.db.Model(&models.HistorialClinico{}).Where("enfermedad = ?", enfermedad.Nombre).Count(&count).Error; err != nil {
+			return err
+		}
+
+		contagiosaStr := "No contagiosa"
+		if enfermedad.EsContagiosa {
+			contagiosaStr = "Contagiosa"
+		}
+
+		log.Printf("   - %s: %d casos (%s)", enfermedad.Nombre, count, contagiosaStr)
+	}
+
+	// Estadísticas por distrito
+	log.Println("\n📍 Distribución por distritos:")
+	for _, direccion := range direccionesSantaCruz {
+		var count int64
+		if err := s.db.Model(&models.HistorialClinico{}).Where("patient_district = ?", direccion.Distrito).Count(&count).Error; err != nil {
+			return err
+		}
+		log.Printf("   - %s: %d casos", direccion.Distrito, count)
+	}
+
+	// Casos contagiosos vs no contagiosos
+	var contagiosos, noContagiosos int64
+	s.db.Model(&models.HistorialClinico{}).Where("is_contagious = ?", true).Count(&contagiosos)
+	s.db.Model(&models.HistorialClinico{}).Where("is_contagious = ?", false).Count(&noContagiosos)
+
+	log.Printf("\n🦠 Casos contagiosos: %d", contagiosos)
+	log.Printf("🏥 Casos no contagiosos: %d", noContagiosos)
+
+	return nil
 }

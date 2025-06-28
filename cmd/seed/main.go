@@ -49,9 +49,9 @@ func main() {
 
 	log.Println("🎉 Proceso de seeding completado exitosamente!")
 	log.Println("📋 Datos disponibles:")
-	log.Println("   🏥 5 Hospitales (usuario de prueba: admin@hospitalcentral.com / admin123)")
+	log.Println("   🏥 15 Hospitales de Santa Cruz de la Sierra")
 	log.Println("   👥 15 Pacientes")
-	log.Println("   📊 12+ Historiales clínicos con datos geográficos de La Paz")
+	log.Println("   📊 12+ Historiales clínicos con datos geográficos")
 	log.Println("   🗺️  Datos listos para mapas de calor epidemiológicos")
 }
 
@@ -70,7 +70,7 @@ func printHelp() {
 	log.Println("  go run cmd/seed/main.go -clean")
 	log.Println("")
 	log.Println("Datos que se insertarán:")
-	log.Println("  🏥 5 Hospitales de La Paz")
+	log.Println("  🏥 15 Hospitales de Santa Cruz de la Sierra")
 	log.Println("  👥 15 Pacientes con datos realistas")
 	log.Println("  📊 12+ Historiales clínicos con coordenadas reales")
 	log.Println("  🗺️  Datos geográficos para mapas de calor")

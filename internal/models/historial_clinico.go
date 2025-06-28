@@ -13,6 +13,7 @@ type HistorialClinico struct {
 	IDHospital     uint      `json:"id_hospital" gorm:"not null" validate:"required"`
 	FechaIngreso   time.Time `json:"fecha_ingreso" gorm:"type:timestamp;not null" validate:"required"`
 	MotivoConsulta string    `json:"motivo_consulta" gorm:"type:varchar(200);not null" validate:"required,min=3,max=200"`
+	Enfermedad     string    `json:"enfermedad" gorm:"type:varchar(150);not null" validate:"required,min=2,max=150"`
 	Diagnostico    string    `json:"diagnostico" gorm:"type:text"`
 	Tratamiento    string    `json:"tratamiento" gorm:"type:text"`
 	Medicamentos   string    `json:"medicamentos" gorm:"type:text"`
@@ -51,6 +52,7 @@ type HistorialClinicoResponse struct {
 	ID                  uint       `json:"id"`
 	FechaIngreso        time.Time  `json:"fecha_ingreso"`
 	MotivoConsulta      string     `json:"motivo_consulta"`
+	Enfermedad          string     `json:"enfermedad"`
 	Diagnostico         string     `json:"diagnostico"`
 	Tratamiento         string     `json:"tratamiento"`
 	Medicamentos        string     `json:"medicamentos"`
@@ -77,6 +79,7 @@ func (h *HistorialClinico) ToResponse() HistorialClinicoResponse {
 		ID:                  h.ID,
 		FechaIngreso:        h.FechaIngreso,
 		MotivoConsulta:      h.MotivoConsulta,
+		Enfermedad:          h.Enfermedad,
 		Diagnostico:         h.Diagnostico,
 		Tratamiento:         h.Tratamiento,
 		Medicamentos:        h.Medicamentos,

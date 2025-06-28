@@ -444,3 +444,54 @@ func (h *HistorialHandler) EvaluateGeocodePrecision(c *gin.Context) {
 
 	utils.SuccessResponse(c, response, "Precisión de geocodificación evaluada exitosamente")
 }
+
+// GetHistorialByEnfermedad obtiene historiales clínicos por nombre de enfermedad
+// @Summary Obtener historiales por enfermedad
+// @Description Obtiene todos los registros del historial clínico que coincidan con el nombre de enfermedad especificado
+// @Tags historial
+// @Produce json
+// @Security BearerAuth
+// @Param enfermedad query string true "Nombre de la enfermedad"
+// @Param page query int false "Número de página" default(1)
+// @Param limit query int false "Elementos por página" default(10)
+// @Success 200 {object} models.EnfermedadSearchResponse
+// @Failure 400 {object} utils.APIErrorResponse
+// @Router /historial/enfermedad [get]
+func (h *HistorialHandler) GetHistorialByEnfermedad(c *gin.Context) {
+	enfermedad := c.Query("enfermedad")
+	if enfermedad == "" {
+		utils.ErrorResponse(c, http.StatusBadRequest, "El parámetro 'enfermedad' es requerido", "MISSING_PARAMETER", "")
+		return
+	}
+
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "10"))
+
+	if page < 1 {
+		page = 1
+	}
+	if limit < 1 || limit > 100 {
+		limit = 10
+	}
+
+	historiales, total, err := h.historialService.GetHistorialByEnfermedad(enfermedad, page, limit)
+	if err != nil {
+		utils.ErrorResponse(c, http.StatusInternalServerError, "Error al obtener historiales por enfermedad", "FETCH_ERROR", err.Error())
+		return
+	}
+
+	// Convertir a formato de respuesta específico
+	responseData := make([]models.HistorialEnfermedadResponse, len(historiales))
+	for i, historial := range historiales {
+		responseData[i] = historial.ToEnfermedadResponse()
+	}
+
+	// Crear respuesta en el formato solicitado
+	response := models.EnfermedadSearchResponse{
+		Message: "Datos obtenidos exitosamente",
+		Total:   total,
+		Data:    responseData,
+	}
+
+	c.JSON(http.StatusOK, response)
+}

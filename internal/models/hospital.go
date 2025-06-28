@@ -11,6 +11,8 @@ type Hospital struct {
 	ID        uint           `json:"id" gorm:"primaryKey;autoIncrement"`
 	Nombre    string         `json:"nombre" gorm:"type:varchar(100);not null" validate:"required,min=2,max=100"`
 	Direccion string         `json:"direccion" gorm:"type:varchar(200);not null" validate:"required,min=5,max=200"`
+	Latitud   float64        `json:"latitud" gorm:"type:decimal(10,8);not null" validate:"required,latitude"`
+	Longitud  float64        `json:"longitud" gorm:"type:decimal(11,8);not null" validate:"required,longitude"`
 	Ciudad    string         `json:"ciudad" gorm:"type:varchar(50);not null" validate:"required,min=2,max=50"`
 	Telefono  string         `json:"telefono" gorm:"type:varchar(20);unique"`
 	Email     string         `json:"email" gorm:"type:varchar(100);unique;not null" validate:"required,email"`
@@ -33,6 +35,8 @@ type HospitalResponse struct {
 	ID        uint      `json:"id"`
 	Nombre    string    `json:"nombre"`
 	Direccion string    `json:"direccion"`
+	Latitud   float64   `json:"latitud"`
+	Longitud  float64   `json:"longitud"`
 	Ciudad    string    `json:"ciudad"`
 	Telefono  string    `json:"telefono"`
 	Email     string    `json:"email"`
@@ -46,6 +50,8 @@ func (h *Hospital) ToResponse() HospitalResponse {
 		ID:        h.ID,
 		Nombre:    h.Nombre,
 		Direccion: h.Direccion,
+		Latitud:   h.Latitud,
+		Longitud:  h.Longitud,
 		Ciudad:    h.Ciudad,
 		Telefono:  h.Telefono,
 		Email:     h.Email,

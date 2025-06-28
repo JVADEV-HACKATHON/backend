@@ -22,6 +22,7 @@ func SetupRoutes() *gin.Engine {
 	authHandler := handlers.NewAuthHandler()
 	pacienteHandler := handlers.NewPacienteHandler()
 	historialHandler := handlers.NewHistorialHandler()
+	hospitalHandler := handlers.NewHospitalHandler()
 
 	// Rutas públicas
 	api := router.Group("/api/v1")
@@ -41,6 +42,9 @@ func SetupRoutes() *gin.Engine {
 			auth.POST("/login", authHandler.Login)
 			auth.POST("/register", authHandler.Register)
 		}
+
+		// Ruta de historial por enfermedad (sin protección)
+		api.GET("/historial/enfermedad", historialHandler.GetHistorialByEnfermedad)
 	}
 
 	// Rutas protegidas (requieren autenticación)
@@ -64,7 +68,15 @@ func SetupRoutes() *gin.Engine {
 			pacientes.DELETE("/:id", pacienteHandler.DeletePaciente)
 		}
 
-		// Gestión de historial clínico
+		// Gestión de hospitales
+		hospitales := protected.Group("/hospitales")
+		{
+			hospitales.GET("/", hospitalHandler.GetAllHospitales)
+			hospitales.GET("/nearby", hospitalHandler.GetHospitalesNearby)
+			hospitales.GET("/:id", hospitalHandler.GetHospital)
+		}
+
+		// Gestión de historial clínico (sin la ruta /enfermedad que ya está en rutas públicas)
 		historial := protected.Group("/historial")
 		{
 			historial.POST("/", historialHandler.CreateHistorial)

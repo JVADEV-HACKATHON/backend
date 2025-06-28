@@ -184,3 +184,26 @@ func (s *HistorialService) GetContagiousHistorial(page, limit int) ([]models.His
 
 	return historiales, total, err
 }
+
+// GetHistorialByEnfermedad obtiene historiales clínicos por nombre de enfermedad
+func (s *HistorialService) GetHistorialByEnfermedad(enfermedad string, page, limit int) ([]models.HistorialClinico, int64, error) {
+	var historiales []models.HistorialClinico
+	var total int64
+
+	// Búsqueda case-insensitive de la enfermedad
+	query := s.db.Where("LOWER(enfermedad) = LOWER(?)", enfermedad)
+
+	// Contar total
+	query.Model(&models.HistorialClinico{}).Count(&total)
+
+	// Obtener registros con paginación y relaciones completas
+	offset := (page - 1) * limit
+	err := query.Preload("Paciente").
+		Preload("Hospital").
+		Offset(offset).
+		Limit(limit).
+		Order("fecha_ingreso DESC").
+		Find(&historiales).Error
+
+	return historiales, total, err
+}

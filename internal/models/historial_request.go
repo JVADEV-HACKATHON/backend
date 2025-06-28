@@ -7,6 +7,7 @@ type HistorialClinicoRequest struct {
 	IDPaciente     uint      `json:"id_paciente" validate:"required"`
 	FechaIngreso   time.Time `json:"fecha_ingreso" validate:"required"`
 	MotivoConsulta string    `json:"motivo_consulta" validate:"required,min=3,max=200"`
+	Enfermedad     string    `json:"enfermedad" validate:"required,min=2,max=150"`
 	Diagnostico    string    `json:"diagnostico"`
 	Tratamiento    string    `json:"tratamiento"`
 	Medicamentos   string    `json:"medicamentos"`
@@ -30,6 +31,7 @@ func (r *HistorialClinicoRequest) ToHistorialClinico() *HistorialClinico {
 		IDPaciente:          r.IDPaciente,
 		FechaIngreso:        r.FechaIngreso,
 		MotivoConsulta:      r.MotivoConsulta,
+		Enfermedad:          r.Enfermedad,
 		Diagnostico:         r.Diagnostico,
 		Tratamiento:         r.Tratamiento,
 		Medicamentos:        r.Medicamentos,
