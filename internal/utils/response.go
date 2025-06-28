@@ -8,7 +8,7 @@ import (
 	"github.com/go-playground/validator/v10"
 )
 
-// APIErrorResponse estructura estándar para respuestas de error
+// APIErrorResponse estructura estándar para respuestas de error2
 type APIErrorResponse struct {
 	Success bool   `json:"success"`
 	Error   string `json:"error"`

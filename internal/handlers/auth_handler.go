@@ -91,3 +91,52 @@ func (h *AuthHandler) GetProfile(c *gin.Context) {
 		"email":       email,
 	}, "Perfil obtenido exitosamente")
 }
+
+// Register maneja el registro de nuevos hospitales
+// @Summary Registro de hospital
+// @Description Registra un nuevo hospital en el sistema
+// @Tags auth
+// @Accept json
+// @Produce json
+// @Param register body services.RegisterRequest true "Datos de registro"
+// @Success 201 {object} services.RegisterResponse
+// @Failure 400 {object} utils.ErrorResponse
+// @Failure 409 {object} utils.ErrorResponse
+// @Router /auth/register [post]
+func (h *AuthHandler) Register(c *gin.Context) {
+	var req services.RegisterRequest
+
+	// Bind JSON
+	if err := c.ShouldBindJSON(&req); err != nil {
+		utils.ErrorResponse(c, http.StatusBadRequest, "Datos inválidos", "INVALID_INPUT", err.Error())
+		return
+	}
+
+	// Validar datos
+	if err := h.validator.Struct(req); err != nil {
+		utils.ValidationErrorResponse(c, err)
+		return
+	}
+
+	// Intentar registro
+	response, err := h.authService.Register(req)
+	if err != nil {
+		// Determinar el código de estado basado en el error
+		statusCode := http.StatusBadRequest
+		errorCode := "REGISTRATION_FAILED"
+
+		if err.Error() == "el email ya está registrado" || err.Error() == "el teléfono ya está registrado" {
+			statusCode = http.StatusConflict
+			errorCode = "ALREADY_EXISTS"
+		}
+
+		utils.ErrorResponse(c, statusCode, err.Error(), errorCode, "")
+		return
+	}
+
+	c.JSON(http.StatusCreated, gin.H{
+		"success": true,
+		"message": response.Message,
+		"data":    response.Hospital,
+	})
+}

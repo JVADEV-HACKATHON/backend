@@ -23,8 +23,23 @@ type LoginRequest struct {
 	Password string `json:"password" validate:"required,min=6"`
 }
 
+type RegisterRequest struct {
+	Nombre    string `json:"nombre" validate:"required,min=2,max=100"`
+	Direccion string `json:"direccion" validate:"required,min=5,max=200"`
+	Ciudad    string `json:"ciudad" validate:"required,min=2,max=50"`
+	Telefono  string `json:"telefono" validate:"omitempty,max=20"`
+	Email     string `json:"email" validate:"required,email"`
+	Password  string `json:"password" validate:"required,min=6"`
+}
+
 type LoginResponse struct {
 	Token    string                  `json:"token"`
+	Hospital models.HospitalResponse `json:"hospital"`
+	Success  bool                    `json:"success"`
+	Message  string                  `json:"message"`
+}
+
+type RegisterResponse struct {
 	Hospital models.HospitalResponse `json:"hospital"`
 	Success  bool                    `json:"success"`
 	Message  string                  `json:"message"`
@@ -67,6 +82,58 @@ func (s *AuthService) Login(req LoginRequest) (*LoginResponse, error) {
 		Hospital: hospital.ToResponse(),
 		Success:  true,
 		Message:  "Login exitoso",
+	}, nil
+}
+
+// Register registra un nuevo hospital en el sistema
+func (s *AuthService) Register(req RegisterRequest) (*RegisterResponse, error) {
+	// Verificar si el email ya existe
+	var existingHospital models.Hospital
+	err := s.db.Where("email = ?", req.Email).First(&existingHospital).Error
+	if err == nil {
+		return nil, errors.New("el email ya está registrado")
+	}
+	if !errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, err
+	}
+
+	// Verificar si el teléfono ya existe (si se proporciona)
+	if req.Telefono != "" {
+		err = s.db.Where("telefono = ?", req.Telefono).First(&existingHospital).Error
+		if err == nil {
+			return nil, errors.New("el teléfono ya está registrado")
+		}
+		if !errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, err
+		}
+	}
+
+	// Hashear la contraseña
+	hashedPassword, err := HashPassword(req.Password)
+	if err != nil {
+		return nil, errors.New("error al procesar la contraseña")
+	}
+
+	// Crear el nuevo hospital
+	hospital := models.Hospital{
+		Nombre:    req.Nombre,
+		Direccion: req.Direccion,
+		Ciudad:    req.Ciudad,
+		Telefono:  req.Telefono,
+		Email:     req.Email,
+		Password:  hashedPassword,
+	}
+
+	// Guardar en la base de datos
+	err = s.db.Create(&hospital).Error
+	if err != nil {
+		return nil, errors.New("error al crear el hospital")
+	}
+
+	return &RegisterResponse{
+		Hospital: hospital.ToResponse(),
+		Success:  true,
+		Message:  "Hospital registrado exitosamente",
 	}, nil
 }
 

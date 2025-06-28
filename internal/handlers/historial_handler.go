@@ -38,8 +38,9 @@ func NewHistorialHandler() *HistorialHandler {
 // @Failure 400 {object} utils.APIErrorResponse
 // @Failure 401 {object} utils.APIErrorResponse
 // @Router /historial [post]
+// CreateHistorial crea un nuevo registro de historial clínico con geocodificación
 func (h *HistorialHandler) CreateHistorial(c *gin.Context) {
-	var historial models.HistorialClinico
+	var request models.HistorialClinicoRequest
 
 	// Obtener ID del hospital del contexto (desde JWT)
 	hospitalID, exists := c.Get("hospital_id")
@@ -49,27 +50,118 @@ func (h *HistorialHandler) CreateHistorial(c *gin.Context) {
 	}
 
 	// Bind JSON
-	if err := c.ShouldBindJSON(&historial); err != nil {
+	if err := c.ShouldBindJSON(&request); err != nil {
 		utils.ErrorResponse(c, http.StatusBadRequest, "Datos inválidos", "INVALID_INPUT", err.Error())
 		return
 	}
 
-	// Asignar hospital desde el JWT
-	historial.IDHospital = hospitalID.(uint)
-
-	// Validar datos
-	if err := h.validator.Struct(historial); err != nil {
+	// Validar datos básicos
+	if err := h.validator.Struct(request); err != nil {
 		utils.ValidationErrorResponse(c, err)
 		return
 	}
 
+	// Crear servicio de geocodificación
+	geocodingService, err := services.NewGeocodingService()
+	if err != nil {
+		utils.ErrorResponse(c, http.StatusInternalServerError, "Error configurando servicio de mapas", "GEOCODING_CONFIG_ERROR", err.Error())
+		return
+	}
+
+	// Obtener información completa de la dirección
+	addressComponents, err := geocodingService.GetAddressComponents(request.PatientAddress)
+	if err != nil {
+		utils.ErrorResponse(c, http.StatusBadRequest, "No se pudo geocodificar la dirección proporcionada", "GEOCODING_ERROR", err.Error())
+		return
+	}
+
+	// Validar que las coordenadas estén en La Paz
+	if !geocodingService.ValidateCoordinates(addressComponents.Coordinates.Latitude, addressComponents.Coordinates.Longitude) {
+		utils.ErrorResponse(c, http.StatusBadRequest, "La dirección debe estar ubicada en La Paz, Bolivia", "INVALID_LOCATION", "")
+		return
+	}
+
+	// Convertir a modelo de base de datos
+	historial := request.ToHistorialClinico()
+
+	// Asignar hospital desde el JWT
+	historial.IDHospital = hospitalID.(uint)
+
+	// Asignar coordenadas y información obtenida
+	historial.PatientLatitude = addressComponents.Coordinates.Latitude
+	historial.PatientLongitude = addressComponents.Coordinates.Longitude
+	historial.PatientAddress = addressComponents.FormattedAddress // Usar dirección formateada
+
+	// Si no se proporcionó distrito, usar el obtenido de Google Maps
+	if historial.PatientDistrict == "" {
+		historial.PatientDistrict = addressComponents.District
+	}
+
+	// Si no se proporcionó barrio, usar el obtenido de Google Maps
+	if historial.PatientNeighborhood == "" {
+		historial.PatientNeighborhood = addressComponents.Neighborhood
+	}
+
 	// Crear historial
-	if err := h.historialService.CreateHistorial(&historial); err != nil {
+	if err := h.historialService.CreateHistorial(historial); err != nil {
 		utils.ErrorResponse(c, http.StatusInternalServerError, "Error al crear historial", "CREATE_ERROR", err.Error())
 		return
 	}
 
-	utils.SuccessResponse(c, historial, "Historial clínico creado exitosamente")
+	// Respuesta con información completa
+	response := map[string]interface{}{
+		"historial": historial,
+		"geocoding_info": map[string]interface{}{
+			"original_address":  request.PatientAddress,
+			"formatted_address": addressComponents.FormattedAddress,
+			"coordinates":       addressComponents.Coordinates,
+			"district":          addressComponents.District,
+			"neighborhood":      addressComponents.Neighborhood,
+		},
+	}
+
+	utils.SuccessResponse(c, response, "Historial clínico creado exitosamente con geocodificación")
+}
+
+func (h *HistorialHandler) GeocodeAddress(c *gin.Context) {
+	var request struct {
+		Address string `json:"address" validate:"required,min=5"`
+	}
+
+	if err := c.ShouldBindJSON(&request); err != nil {
+		utils.ErrorResponse(c, http.StatusBadRequest, "Datos inválidos", "INVALID_INPUT", err.Error())
+		return
+	}
+
+	if err := h.validator.Struct(request); err != nil {
+		utils.ValidationErrorResponse(c, err)
+		return
+	}
+
+	// Crear servicio de geocodificación
+	geocodingService, err := services.NewGeocodingService()
+	if err != nil {
+		utils.ErrorResponse(c, http.StatusInternalServerError, "Error configurando servicio de mapas", "GEOCODING_CONFIG_ERROR", err.Error())
+		return
+	}
+
+	// Geocodificar dirección
+	addressComponents, err := geocodingService.GetAddressComponents(request.Address)
+	if err != nil {
+		utils.ErrorResponse(c, http.StatusBadRequest, "No se pudo geocodificar la dirección", "GEOCODING_ERROR", err.Error())
+		return
+	}
+
+	// Validar ubicación
+	isValid := geocodingService.ValidateCoordinates(addressComponents.Coordinates.Latitude, addressComponents.Coordinates.Longitude)
+
+	response := map[string]interface{}{
+		"address_components": addressComponents,
+		"is_valid_location":  isValid,
+		"location_note":      "La dirección debe estar en La Paz, Bolivia",
+	}
+
+	utils.SuccessResponse(c, response, "Dirección geocodificada exitosamente")
 }
 
 // GetHistorial obtiene un registro de historial clínico por ID

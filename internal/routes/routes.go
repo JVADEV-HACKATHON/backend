@@ -39,6 +39,7 @@ func SetupRoutes() *gin.Engine {
 		auth := api.Group("/auth")
 		{
 			auth.POST("/login", authHandler.Login)
+			auth.POST("/register", authHandler.Register)
 		}
 	}
 
