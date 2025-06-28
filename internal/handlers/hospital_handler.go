@@ -131,3 +131,13 @@ func (h *HospitalHandler) GetHospitalesNearby(c *gin.Context) {
 
 	utils.SuccessResponse(c, hospitales, "Hospitales cercanos obtenidos exitosamente")
 }
+
+func (h *HospitalHandler) GetAllHospitalesPublic(c *gin.Context) {
+	hospitales, err := h.hospitalService.GetAllHospitalesSinPaginacion()
+	if err != nil {
+		utils.ErrorResponse(c, http.StatusInternalServerError, "Error al obtener hospitales", "FETCH_ERROR", err.Error())
+		return
+	}
+
+	utils.SuccessResponse(c, hospitales, "Hospitales obtenidos exitosamente")
+}

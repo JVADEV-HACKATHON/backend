@@ -146,3 +146,18 @@ func (s *HospitalService) UpdateHospitalLocation(hospitalID uint, lat, lng float
 
 	return nil
 }
+func (s *HospitalService) GetAllHospitalesSinPaginacion() ([]models.HospitalResponse, error) {
+	var hospitales []models.Hospital
+
+	if err := s.db.Find(&hospitales).Error; err != nil {
+		return nil, err
+	}
+
+	// Convertir a HospitalResponse para no exponer información sensible
+	var hospitalesResponse []models.HospitalResponse
+	for _, hospital := range hospitales {
+		hospitalesResponse = append(hospitalesResponse, hospital.ToResponse())
+	}
+
+	return hospitalesResponse, nil
+}

@@ -24,7 +24,7 @@ func SetupRoutes() *gin.Engine {
 	historialHandler := handlers.NewHistorialHandler()
 	hospitalHandler := handlers.NewHospitalHandler()
 
-	// Rutas públicas
+	// Todas las rutas son públicas ahora
 	api := router.Group("/api/v1")
 	{
 		// Health check
@@ -36,63 +36,55 @@ func SetupRoutes() *gin.Engine {
 			})
 		})
 
-		// Autenticación (sin middleware de auth)
+		// Autenticación
 		auth := api.Group("/auth")
 		{
 			auth.POST("/login", authHandler.Login)
 			auth.POST("/register", authHandler.Register)
-		}
-
-		// Ruta de historial por enfermedad (sin protección)
-		api.GET("/historial/enfermedad", historialHandler.GetHistorialByEnfermedad)
-	}
-
-	// Rutas protegidas (requieren autenticación)
-	protected := api.Group("/")
-	protected.Use(middleware.AuthMiddleware())
-	{
-		// Perfil del hospital autenticado
-		auth := protected.Group("/auth")
-		{
 			auth.GET("/profile", authHandler.GetProfile)
 		}
 
 		// Gestión de pacientes
-		pacientes := protected.Group("/pacientes")
+		pacientes := api.Group("/pacientes")
 		{
 			pacientes.POST("/", pacienteHandler.CreatePaciente)
-			pacientes.GET("/", pacienteHandler.GetAllPacientes)
 			pacientes.GET("/search", pacienteHandler.SearchPacientes)
+			pacientes.GET("/", pacienteHandler.GetAllPacientes)
 			pacientes.GET("/:id", pacienteHandler.GetPaciente)
 			pacientes.PUT("/:id", pacienteHandler.UpdatePaciente)
 			pacientes.DELETE("/:id", pacienteHandler.DeletePaciente)
 		}
 
+		// Rutas adicionales de pacientes
+
 		// Gestión de hospitales
-		hospitales := protected.Group("/hospitales")
+		hospitales := api.Group("/hospitales")
 		{
 			hospitales.GET("/", hospitalHandler.GetAllHospitales)
 			hospitales.GET("/nearby", hospitalHandler.GetHospitalesNearby)
 			hospitales.GET("/:id", hospitalHandler.GetHospital)
 		}
 
-		// Gestión de historial clínico (sin la ruta /enfermedad que ya está en rutas públicas)
-		historial := protected.Group("/historial")
+		// Ruta adicional de hospitales
+
+		// Gestión de historial clínico
+		historial := api.Group("/historial")
 		{
 			historial.POST("/", historialHandler.CreateHistorial)
+			historial.GET("/", hospitalHandler.GetAllHospitales)
 			historial.GET("/:id", historialHandler.GetHistorial)
 			historial.PUT("/:id", historialHandler.UpdateHistorial)
 			historial.DELETE("/:id", historialHandler.DeleteHistorial)
 			historial.GET("/paciente/:paciente_id", historialHandler.GetHistorialByPaciente)
-			historial.GET("/hospital", historialHandler.GetHistorialByHospital)
+			historial.GET("/enfermedad", historialHandler.GetHistorialByEnfermedad)
 		}
 
 		// Endpoints para geocodificación
-		protected.POST("/geocode", historialHandler.GeocodeAddress)
-		protected.POST("/geocode/evaluate", historialHandler.EvaluateGeocodePrecision)
+		api.POST("/geocode", historialHandler.GeocodeAddress)
+		api.POST("/geocode/evaluate", historialHandler.EvaluateGeocodePrecision)
 
 		// Epidemiología y mapas de calor
-		epidemiologia := protected.Group("/epidemiologia")
+		epidemiologia := api.Group("/epidemiologia")
 		{
 			epidemiologia.GET("/stats", historialHandler.GetEpidemiologicalStats)
 			epidemiologia.GET("/contagious", historialHandler.GetContagiousHistorial)
