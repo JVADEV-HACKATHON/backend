@@ -1,0 +1,67 @@
+# Binarios compilados
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+bin/
+
+# Archivos de prueba
+*.test
+
+# Output de cobertura
+*.out
+
+# Dependencias de módulos Go
+go.work
+
+# Variables de entorno sensibles
+.env
+.env.local
+.env.production
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS generados
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Base de datos local
+*.db
+*.sqlite
+
+# Archivos temporales
+tmp/
+temp/
+
+# Docker
+.docker/
+
+# Archivos de backup
+*.bak
+*.backup
+
+# Archivos de configuración específicos del usuario
+config.local.json
+
+# Archivos de IDE específicos
+.vscode/settings.json
+.vscode/launch.json
+
+# Coverage reports
+coverage.html
+coverage.out
