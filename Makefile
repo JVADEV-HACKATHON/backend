@@ -1,6 +1,6 @@
 # Makefile para el proyecto Hospital API
 
-.PHONY: help build run test clean docker-build docker-run docker-stop deps
+.PHONY: help build run test clean docker-build docker-run docker-stop deps seed seed-clean db-reset fresh-start dev-with-data
 
 # Variables
 BINARY_NAME=hospital-api
@@ -62,6 +62,24 @@ db-reset: ## Reinicia la base de datos
 	docker-compose down db
 	docker volume rm api-go_postgres_data
 	docker-compose up -d db
+
+# Seeding
+seed: ## Inserta datos de prueba en la base de datos
+	go run cmd/seed/main.go
+
+seed-clean: ## Limpia la base de datos e inserta datos frescos
+	go run cmd/seed/main.go -clean
+
+# Comandos combinados
+fresh-start: db-reset seed ## Reinicia la BD e inserta datos de prueba
+	@echo "🎉 Base de datos reiniciada y datos de prueba insertados"
+
+dev-with-data: docker-run ## Inicia la aplicación con datos de prueba automáticos
+	@echo "🚀 Aplicación iniciada con seeding automático habilitado"
+
+dev-no-seed: ## Inicia la aplicación SIN datos de prueba automáticos
+	AUTO_SEED=false docker-compose up -d
+	@echo "🚀 Aplicación iniciada SIN seeding automático"
 
 # Logs
 logs: ## Muestra logs de la aplicación

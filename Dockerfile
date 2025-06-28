@@ -1,5 +1,5 @@
 # Build stage
-FROM golang:1.24.4-alpine AS builder
+FROM golang:1.23-alpine AS builder
 
 WORKDIR /app
 
@@ -15,22 +15,30 @@ RUN go mod download
 # Copy source code
 COPY . .
 
-# Build the application
+# Build the main application
 RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o main ./cmd/server
+
+# Build the seeder application
+RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o seed ./cmd/seed
 
 # Final stage
 FROM alpine:latest
 
-RUN apk --no-cache add ca-certificates tzdata
+RUN apk --no-cache add ca-certificates tzdata netcat-openbsd
 
 WORKDIR /root/
 
-# Copy the binary from builder stage
+# Copy the binaries from builder stage
 COPY --from=builder /app/main .
+COPY --from=builder /app/seed .
 
-# Copy .env file
-COPY --from=builder /app/.env .
+# Copy .env file if exists
+COPY --from=builder /app/.env* ./
+
+# Copy and set permissions for entrypoint script
+COPY scripts/entrypoint.sh ./
+RUN chmod +x entrypoint.sh
 
 EXPOSE 8080
 
-CMD ["./main"]
+CMD ["./entrypoint.sh"]

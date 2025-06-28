@@ -398,3 +398,49 @@ func (h *HistorialHandler) GetContagiousHistorial(c *gin.Context) {
 
 	utils.PaginatedSuccessResponse(c, historiales, "Casos contagiosos obtenidos exitosamente", page, limit, total)
 }
+
+// EvaluateGeocodePrecision evalúa la precisión de una geocodificación
+func (h *HistorialHandler) EvaluateGeocodePrecision(c *gin.Context) {
+	var request struct {
+		Address string `json:"address" validate:"required,min=5"`
+	}
+
+	if err := c.ShouldBindJSON(&request); err != nil {
+		utils.ErrorResponse(c, http.StatusBadRequest, "Datos inválidos", "INVALID_INPUT", err.Error())
+		return
+	}
+
+	if err := h.validator.Struct(request); err != nil {
+		utils.ValidationErrorResponse(c, err)
+		return
+	}
+
+	// Crear servicio de geocodificación
+	geocodingService, err := services.NewGeocodingService()
+	if err != nil {
+		utils.ErrorResponse(c, http.StatusInternalServerError, "Error configurando servicio de mapas", "GEOCODING_CONFIG_ERROR", err.Error())
+		return
+	}
+
+	// Geocodificar dirección
+	addressComponents, err := geocodingService.GetAddressComponents(request.Address)
+	if err != nil {
+		utils.ErrorResponse(c, http.StatusBadRequest, "No se pudo geocodificar la dirección", "GEOCODING_ERROR", err.Error())
+		return
+	}
+
+	// Validar ubicación
+	isValid := geocodingService.ValidateCoordinates(addressComponents.Coordinates.Latitude, addressComponents.Coordinates.Longitude)
+
+	// Evaluar precisión
+	evaluacion := geocodingService.EvaluarPrecisionGeocoding(addressComponents)
+
+	response := map[string]interface{}{
+		"address_components": addressComponents,
+		"is_valid_location":  isValid,
+		"location_note":      "La dirección debe estar en La Paz, Bolivia",
+		"evaluacion":         evaluacion,
+	}
+
+	utils.SuccessResponse(c, response, "Precisión de geocodificación evaluada exitosamente")
+}

@@ -75,6 +75,10 @@ func SetupRoutes() *gin.Engine {
 			historial.GET("/hospital", historialHandler.GetHistorialByHospital)
 		}
 
+		// Endpoints para geocodificación
+		protected.POST("/geocode", historialHandler.GeocodeAddress)
+		protected.POST("/geocode/evaluate", historialHandler.EvaluateGeocodePrecision)
+
 		// Epidemiología y mapas de calor
 		epidemiologia := protected.Group("/epidemiologia")
 		{

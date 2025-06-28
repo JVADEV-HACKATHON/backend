@@ -18,6 +18,7 @@ services:
       - PORT=8080
       - GIN_MODE=debug
       - API_VERSION=v1
+      - AUTO_SEED=true
     volumes:
       - .:/app
     networks:

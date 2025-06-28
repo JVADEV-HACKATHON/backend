@@ -4,7 +4,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math"
 	"os"
+	"regexp"
 	"strings"
 
 	"googlemaps.github.io/maps"
@@ -155,4 +157,108 @@ func (g *GeocodingService) ValidateCoordinates(lat, lng float64) bool {
 	// Latitud: -16.7 a -16.4
 	// Longitud: -68.2 a -67.9
 	return lat >= -16.7 && lat <= -16.4 && lng >= -68.2 && lng <= -67.9
+}
+
+// EvaluarPrecisionGeocoding evalúa qué tan precisa es la ubicación geocodificada
+func (g *GeocodingService) EvaluarPrecisionGeocoding(address *AddressComponents) map[string]interface{} {
+	result := make(map[string]interface{})
+
+	// Iniciar con una confianza base
+	confidence := 0.5
+
+	// 1. Verificar si tiene coordenadas precisas (más de 5 decimales)
+	latStr := fmt.Sprintf("%.7f", address.Coordinates.Latitude)
+	lngStr := fmt.Sprintf("%.7f", address.Coordinates.Longitude)
+	latDecimals := len(latStr) - strings.IndexByte(latStr, '.') - 1
+	lngDecimals := len(lngStr) - strings.IndexByte(lngStr, '.') - 1
+
+	// Calcular precisión basada en decimales
+	if latDecimals >= 6 && lngDecimals >= 6 {
+		confidence += 0.2
+		result["precision_nivel"] = "muy alta"
+	} else if latDecimals >= 5 && lngDecimals >= 5 {
+		confidence += 0.15
+		result["precision_nivel"] = "alta"
+	} else if latDecimals >= 4 && lngDecimals >= 4 {
+		confidence += 0.1
+		result["precision_nivel"] = "media"
+	} else {
+		result["precision_nivel"] = "baja"
+	}
+
+	// 2. Verificar componentes de dirección
+	if address.District != "" {
+		confidence += 0.1
+	}
+	if address.Neighborhood != "" {
+		confidence += 0.15
+	}
+
+	// 3. Verificar si hay número en la dirección
+	if strings.Count(address.FormattedAddress, " ") > 1 &&
+		regexp.MustCompile(`\d+`).MatchString(address.FormattedAddress) {
+		confidence += 0.1
+	}
+
+	// 4. Verificar que esté dentro de La Paz (esto ya se hace en el servicio)
+	if g.ValidateCoordinates(address.Coordinates.Latitude, address.Coordinates.Longitude) {
+		confidence += 0.1
+	} else {
+		confidence -= 0.5 // Penalizar fuertemente si está fuera de La Paz
+	}
+
+	// Limitar a rango 0-1
+	if confidence > 1.0 {
+		confidence = 1.0
+	} else if confidence < 0.0 {
+		confidence = 0.0
+	}
+
+	result["confidence"] = confidence
+
+	// Distancia al centro de La Paz (Plaza Murillo: -16.4957, -68.1336)
+	centroPazLat, centroPazLng := -16.4957, -68.1336
+	distancia := calcularDistanciaHaversine(
+		address.Coordinates.Latitude,
+		address.Coordinates.Longitude,
+		centroPazLat,
+		centroPazLng)
+
+	result["distancia_centro_ciudad_km"] = distancia
+
+	// Sugerencia de precisión
+	if confidence > 0.8 {
+		result["sugerencia"] = "Ubicación muy precisa"
+	} else if confidence > 0.6 {
+		result["sugerencia"] = "Ubicación aceptablemente precisa"
+	} else if confidence > 0.4 {
+		result["sugerencia"] = "Ubicación con precisión moderada"
+	} else {
+		result["sugerencia"] = "Ubicación poco precisa, considere verificar manualmente"
+	}
+
+	return result
+}
+
+// calcularDistanciaHaversine calcula la distancia entre dos puntos geográficos usando la fórmula de Haversine
+func calcularDistanciaHaversine(lat1, lng1, lat2, lng2 float64) float64 {
+	// Radio de la Tierra en km
+	const R = 6371.0
+
+	// Convertir a radianes
+	lat1Rad := lat1 * math.Pi / 180
+	lng1Rad := lng1 * math.Pi / 180
+	lat2Rad := lat2 * math.Pi / 180
+	lng2Rad := lng2 * math.Pi / 180
+
+	// Diferencias
+	dLat := lat2Rad - lat1Rad
+	dLng := lng2Rad - lng1Rad
+
+	// Fórmula de Haversine
+	a := math.Sin(dLat/2)*math.Sin(dLat/2) +
+		math.Cos(lat1Rad)*math.Cos(lat2Rad)*math.Sin(dLng/2)*math.Sin(dLng/2)
+	c := 2 * math.Atan2(math.Sqrt(a), math.Sqrt(1-a))
+
+	return R * c
 }
