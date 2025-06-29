@@ -141,3 +141,124 @@ func (h *HospitalHandler) GetAllHospitalesPublic(c *gin.Context) {
 
 	utils.SuccessResponse(c, hospitales, "Hospitales obtenidos exitosamente")
 }
+
+func (h *HospitalHandler) GetAllHospitalesWithPatientsCount(c *gin.Context) {
+	// Verificar si se quiere paginación
+	paginated := c.DefaultQuery("paginated", "true") == "true"
+
+	if !paginated {
+		// Sin paginación - obtener todos los hospitales
+		hospitales, err := h.hospitalService.GetAllHospitalesWithPatientsCount()
+		if err != nil {
+			utils.ErrorResponse(c, http.StatusInternalServerError, "Error al obtener hospitales con conteo de pacientes", "FETCH_ERROR", err.Error())
+			return
+		}
+
+		utils.SuccessResponse(c, hospitales, "Hospitales con conteo de pacientes obtenidos exitosamente")
+		return
+	}
+
+	// Con paginación
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "10"))
+
+	if page < 1 {
+		page = 1
+	}
+	if limit < 1 || limit > 100 {
+		limit = 10
+	}
+
+	hospitales, total, err := h.hospitalService.GetAllHospitalesWithPatientsCountPaginated(page, limit)
+	if err != nil {
+		utils.ErrorResponse(c, http.StatusInternalServerError, "Error al obtener hospitales con conteo de pacientes", "FETCH_ERROR", err.Error())
+		return
+	}
+
+	utils.PaginatedSuccessResponse(c, hospitales, "Hospitales con conteo de pacientes obtenidos exitosamente", page, limit, total)
+}
+
+// GetHospitalWithPatientsCount obtiene un hospital específico con el conteo de pacientes
+// @Summary Obtener hospital por ID con conteo de pacientes
+// @Description Obtiene un hospital específico con la cantidad de pacientes únicos que ha atendido
+// @Tags hospitales
+// @Produce json
+// @Security BearerAuth
+// @Param id path int true "ID del hospital"
+// @Success 200 {object} services.HospitalWithPatientsCount
+// @Failure 400 {object} utils.APIErrorResponse
+// @Failure 404 {object} utils.APIErrorResponse
+// @Router /hospitales/{id}/with-patients-count [get]
+func (h *HospitalHandler) GetHospitalWithPatientsCount(c *gin.Context) {
+	idParam := c.Param("id")
+	id, err := strconv.ParseUint(idParam, 10, 32)
+	if err != nil {
+		utils.ErrorResponse(c, http.StatusBadRequest, "ID inválido", "INVALID_ID", "")
+		return
+	}
+
+	hospital, err := h.hospitalService.GetHospitalWithPatientsCountByID(uint(id))
+	if err != nil {
+		if err.Error() == "hospital no encontrado" {
+			utils.ErrorResponse(c, http.StatusNotFound, err.Error(), "NOT_FOUND", "")
+		} else {
+			utils.ErrorResponse(c, http.StatusInternalServerError, "Error al obtener hospital con conteo de pacientes", "FETCH_ERROR", err.Error())
+		}
+		return
+	}
+
+	utils.SuccessResponse(c, hospital, "Hospital con conteo de pacientes obtenido exitosamente")
+}
+
+// GetHospitalesStatsOverview obtiene estadísticas generales de todos los hospitales
+// @Summary Obtener estadísticas generales de hospitales
+// @Description Obtiene estadísticas generales como total de hospitales, total de pacientes atendidos, etc.
+// @Tags hospitales
+// @Produce json
+// @Security BearerAuth
+// @Success 200 {object} map[string]interface{}
+// @Failure 500 {object} utils.APIErrorResponse
+// @Router /hospitales/stats-overview [get]
+func (h *HospitalHandler) GetHospitalesStatsOverview(c *gin.Context) {
+	hospitales, err := h.hospitalService.GetAllHospitalesWithPatientsCount()
+	if err != nil {
+		utils.ErrorResponse(c, http.StatusInternalServerError, "Error al obtener estadísticas de hospitales", "FETCH_ERROR", err.Error())
+		return
+	}
+
+	// Calcular estadísticas
+	totalHospitales := len(hospitales)
+	var totalPacientesUnicos int64
+	var hospitalConMasPacientes *services.HospitalWithPatientsCount
+	var hospitalConMenosPacientes *services.HospitalWithPatientsCount
+
+	for i, hospital := range hospitales {
+		totalPacientesUnicos += hospital.TotalPacientes
+
+		// Hospital con más pacientes
+		if hospitalConMasPacientes == nil || hospital.TotalPacientes > hospitalConMasPacientes.TotalPacientes {
+			hospitalConMasPacientes = &hospitales[i]
+		}
+
+		// Hospital con menos pacientes (solo si tiene al menos 1 paciente)
+		if hospital.TotalPacientes > 0 && (hospitalConMenosPacientes == nil || hospital.TotalPacientes < hospitalConMenosPacientes.TotalPacientes) {
+			hospitalConMenosPacientes = &hospitales[i]
+		}
+	}
+
+	// Calcular promedio
+	var promedioPacientesPorHospital float64
+	if totalHospitales > 0 {
+		promedioPacientesPorHospital = float64(totalPacientesUnicos) / float64(totalHospitales)
+	}
+
+	stats := map[string]interface{}{
+		"total_hospitales":                totalHospitales,
+		"total_pacientes_unicos_atendidos": totalPacientesUnicos,
+		"promedio_pacientes_por_hospital":  promedioPacientesPorHospital,
+		"hospital_con_mas_pacientes":       hospitalConMasPacientes,
+		"hospital_con_menos_pacientes":     hospitalConMenosPacientes,
+	}
+
+	utils.SuccessResponse(c, stats, "Estadísticas generales de hospitales obtenidas exitosamente")
+}

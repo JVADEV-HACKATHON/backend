@@ -64,6 +64,9 @@ func SetupRoutes() *gin.Engine {
 			hospitales.GET("/", hospitalHandler.GetAllHospitales)
 			hospitales.GET("/nearby", hospitalHandler.GetHospitalesNearby)
 			hospitales.GET("/:id", hospitalHandler.GetHospital)
+			hospitales.GET("/with-patients-count", hospitalHandler.GetAllHospitalesWithPatientsCount)
+			hospitales.GET("/:id/with-patients-count", hospitalHandler.GetHospitalWithPatientsCount)
+			hospitales.GET("/stats-overview", hospitalHandler.GetHospitalesStatsOverview)
 		}
 
 		// Gestión de historial clínico

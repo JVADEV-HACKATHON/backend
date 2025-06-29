@@ -161,3 +161,118 @@ func (s *HospitalService) GetAllHospitalesSinPaginacion() ([]models.HospitalResp
 
 	return hospitalesResponse, nil
 }
+
+// HospitalWithPatientsCount estructura para incluir el conteo de pacientes
+type HospitalWithPatientsCount struct {
+	Hospital      models.HospitalResponse `json:"hospital"`
+	TotalPacientes int64                  `json:"total_pacientes"`
+}
+
+// GetAllHospitalesWithPatientsCount obtiene todos los hospitales con el conteo de pacientes únicos
+func (s *HospitalService) GetAllHospitalesWithPatientsCount() ([]HospitalWithPatientsCount, error) {
+	var hospitales []models.Hospital
+
+	// Obtener todos los hospitales
+	if err := s.db.Find(&hospitales).Error; err != nil {
+		return nil, err
+	}
+
+	var hospitalesConConteo []HospitalWithPatientsCount
+
+	// Para cada hospital, contar los pacientes únicos que han tenido historial clínico
+	for _, hospital := range hospitales {
+		var totalPacientes int64
+		
+		// Contar pacientes únicos que han tenido historial clínico en este hospital
+		err := s.db.Model(&models.HistorialClinico{}).
+			Where("id_hospital = ?", hospital.ID).
+			Distinct("id_paciente").
+			Count(&totalPacientes).Error
+
+		if err != nil {
+			return nil, err
+		}
+
+		hospitalConConteo := HospitalWithPatientsCount{
+			Hospital:       hospital.ToResponse(),
+			TotalPacientes: totalPacientes,
+		}
+
+		hospitalesConConteo = append(hospitalesConConteo, hospitalConConteo)
+	}
+
+	return hospitalesConConteo, nil
+}
+
+// GetAllHospitalesWithPatientsCountPaginated obtiene todos los hospitales con el conteo de pacientes únicos con paginación
+func (s *HospitalService) GetAllHospitalesWithPatientsCountPaginated(page, limit int) ([]HospitalWithPatientsCount, int64, error) {
+	var hospitales []models.Hospital
+	var totalHospitales int64
+
+	// Contar total de hospitales
+	if err := s.db.Model(&models.Hospital{}).Count(&totalHospitales).Error; err != nil {
+		return nil, 0, err
+	}
+
+	// Obtener hospitales con paginación
+	offset := (page - 1) * limit
+	if err := s.db.Offset(offset).Limit(limit).Find(&hospitales).Error; err != nil {
+		return nil, 0, err
+	}
+
+	var hospitalesConConteo []HospitalWithPatientsCount
+
+	// Para cada hospital, contar los pacientes únicos
+	for _, hospital := range hospitales {
+		var totalPacientes int64
+		
+		err := s.db.Model(&models.HistorialClinico{}).
+			Where("id_hospital = ?", hospital.ID).
+			Distinct("id_paciente").
+			Count(&totalPacientes).Error
+
+		if err != nil {
+			return nil, 0, err
+		}
+
+		hospitalConConteo := HospitalWithPatientsCount{
+			Hospital:       hospital.ToResponse(),
+			TotalPacientes: totalPacientes,
+		}
+
+		hospitalesConConteo = append(hospitalesConConteo, hospitalConConteo)
+	}
+
+	return hospitalesConConteo, totalHospitales, nil
+}
+
+// GetHospitalWithPatientsCountByID obtiene un hospital específico con el conteo de pacientes
+func (s *HospitalService) GetHospitalWithPatientsCountByID(hospitalID uint) (*HospitalWithPatientsCount, error) {
+	var hospital models.Hospital
+
+	// Obtener el hospital
+	if err := s.db.First(&hospital, hospitalID).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, errors.New("hospital no encontrado")
+		}
+		return nil, err
+	}
+
+	// Contar pacientes únicos
+	var totalPacientes int64
+	err := s.db.Model(&models.HistorialClinico{}).
+		Where("id_hospital = ?", hospital.ID).
+		Distinct("id_paciente").
+		Count(&totalPacientes).Error
+
+	if err != nil {
+		return nil, err
+	}
+
+	hospitalConConteo := &HospitalWithPatientsCount{
+		Hospital:       hospital.ToResponse(),
+		TotalPacientes: totalPacientes,
+	}
+
+	return hospitalConConteo, nil
+}

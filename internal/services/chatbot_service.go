@@ -83,7 +83,7 @@ func NewChatbotService() *ChatbotService {
 			Timeout: 30 * time.Second,
 		},
 		apiKey:  os.Getenv("GEMINI_API_KEY"),
-		baseURL: "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent",
+		baseURL: "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-latest:generateContent",
 	}
 }
 
