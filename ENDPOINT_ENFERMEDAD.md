@@ -1,32 +1,37 @@
 # Endpoint: Buscar Historiales por Enfermedad
 
 ## Descripción
+
 Endpoint que permite buscar historiales clínicos por nombre de enfermedad y devuelve los datos en el formato específico solicitado.
 
 ## URL
+
 ```
 GET /api/v1/historial/enfermedad
 ```
 
 ## Autenticación
+
 - Requiere token JWT de hospital autenticado
 - Header: `Authorization: Bearer <token>`
 
 ## Parámetros de Consulta
 
-| Parámetro  | Tipo   | Requerido | Descripción                    | Ejemplo     |
-|------------|--------|-----------|--------------------------------|-------------|
-| enfermedad | string | Sí        | Nombre de la enfermedad        | `Dengue`    |
-| page       | int    | No        | Número de página (default: 1)  | `1`         |
-| limit      | int    | No        | Elementos por página (max: 100, default: 10) | `10` |
+| Parámetro  | Tipo   | Requerido | Descripción                                  | Ejemplo  |
+| ---------- | ------ | --------- | -------------------------------------------- | -------- |
+| enfermedad | string | Sí        | Nombre de la enfermedad                      | `Dengue` |
+| page       | int    | No        | Número de página (default: 1)                | `1`      |
+| limit      | int    | No        | Elementos por página (max: 100, default: 10) | `10`     |
 
 ## Ejemplo de Solicitud
+
 ```bash
 curl -X GET "http://localhost:8080/api/v1/historial/enfermedad?enfermedad=Dengue&page=1&limit=10" \
      -H "Authorization: Bearer your-jwt-token"
 ```
 
 ## Ejemplo de Respuesta
+
 ```json
 {
   "message": "Datos obtenidos exitosamente",
@@ -40,8 +45,8 @@ curl -X GET "http://localhost:8080/api/v1/historial/enfermedad?enfermedad=Dengue
       "tratamiento": "Reposo absoluto e hidratación oral",
       "medicamentos": "Paracetamol 500mg cada 6 horas",
       "observaciones": "Paciente en vigilancia epidemiológica",
-      "patient_latitude": -17.783300,
-      "patient_longitude": -63.182100,
+      "patient_latitude": -17.7833,
+      "patient_longitude": -63.1821,
       "patient_address": "Av. San Martín 3456, Equipetrol",
       "patient_district": "Equipetrol",
       "patient_neighborhood": "Equipetrol Norte",
@@ -71,6 +76,7 @@ curl -X GET "http://localhost:8080/api/v1/historial/enfermedad?enfermedad=Dengue
 ```
 
 ## Enfermedades Disponibles
+
 El seeder genera datos para las siguientes enfermedades:
 
 1. **Dengue** (contagiosa)
@@ -82,12 +88,12 @@ El seeder genera datos para las siguientes enfermedades:
 
 ## Códigos de Respuesta
 
-| Código | Descripción |
-|--------|-------------|
-| 200    | Éxito - Datos obtenidos correctamente |
-| 400    | Error - Parámetro 'enfermedad' faltante |
+| Código | Descripción                                    |
+| ------ | ---------------------------------------------- |
+| 200    | Éxito - Datos obtenidos correctamente          |
+| 400    | Error - Parámetro 'enfermedad' faltante        |
 | 401    | No autenticado - Token JWT inválido o faltante |
-| 500    | Error interno del servidor |
+| 500    | Error interno del servidor                     |
 
 ## Características Especiales
 

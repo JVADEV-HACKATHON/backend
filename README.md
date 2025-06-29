@@ -39,16 +39,19 @@ Una API REST completa desarrollada con Go y Gin para la gestión de sistemas hos
 ## 📊 Modelo de Datos
 
 ### Hospital
+
 - ID, nombre, dirección, ciudad, teléfono
 - Email y password hasheado para autenticación
 - Relación con historiales clínicos
 
 ### Paciente
+
 - Información personal (nombre, fecha nacimiento, sexo)
 - Datos médicos (tipo sangre, peso, altura)
 - Relación con historiales clínicos
 
 ### Historial Clínico
+
 - Información médica (motivo, diagnóstico, tratamiento)
 - **Geolocalización crítica** (latitud, longitud, dirección, distrito)
 - Datos epidemiológicos (fecha síntomas, es contagioso)
@@ -57,18 +60,21 @@ Una API REST completa desarrollada con Go y Gin para la gestión de sistemas hos
 ## 🐳 Inicio Rápido con Docker
 
 1. **Clona el repositorio:**
+
 ```bash
 git clone <repo-url>
 cd hospital-api
 ```
 
 2. **Configura las variables de entorno:**
+
 ```bash
 cp .env.example .env
 # Edita .env con tus valores si es necesario
 ```
 
 3. **Inicia con Docker Compose:**
+
 ```bash
 make docker-run
 # o
@@ -76,6 +82,7 @@ docker-compose up -d
 ```
 
 4. **Verifica que esté funcionando:**
+
 ```bash
 curl http://localhost:8080/api/v1/health
 ```
@@ -83,6 +90,7 @@ curl http://localhost:8080/api/v1/health
 ## 💻 Desarrollo Local
 
 ### Prerrequisitos
+
 - Go 1.24.4+
 - PostgreSQL 16+
 - Make (opcional, para comandos automatizados)
@@ -90,6 +98,7 @@ curl http://localhost:8080/api/v1/health
 ### Configuración
 
 1. **Instala dependencias:**
+
 ```bash
 make deps
 # o
@@ -97,12 +106,14 @@ go mod download && go mod tidy
 ```
 
 2. **Inicia PostgreSQL:**
+
 ```bash
 # Solo la base de datos
 docker-compose up -d db
 ```
 
 3. **Ejecuta la aplicación:**
+
 ```bash
 make dev
 # o
@@ -324,7 +335,7 @@ Este proyecto está bajo la Licencia MIT - ver el archivo [LICENSE](LICENSE) par
 
 ## 👥 Autores
 
-- **Tu Nombre** - *Desarrollo inicial* - [TuGitHub](https://github.com/tuusername)
+- **Tu Nombre** - _Desarrollo inicial_ - [TuGitHub](https://github.com/tuusername)
 
 ## 🙏 Agradecimientos
 
