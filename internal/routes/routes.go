@@ -23,7 +23,9 @@ func SetupRoutes() *gin.Engine {
 	pacienteHandler := handlers.NewPacienteHandler()
 	historialHandler := handlers.NewHistorialHandler()
 	hospitalHandler := handlers.NewHospitalHandler()
-	propagacionHandler := handlers.NewPropagacionHandler() // AGREGADO: handler faltante
+	propagacionHandler := handlers.NewPropagacionHandler()
+	// AGREGADO: Crear instancia del chatbot handler
+	chatbotHandler := handlers.NewChatbotHandler()
 
 	// Todas las rutas son públicas ahora
 	api := router.Group("/api/v1")
@@ -56,8 +58,6 @@ func SetupRoutes() *gin.Engine {
 			pacientes.DELETE("/:id", pacienteHandler.DeletePaciente)
 		}
 
-		// Rutas adicionales de pacientes
-
 		// Gestión de hospitales
 		hospitales := api.Group("/hospitales")
 		{
@@ -65,8 +65,6 @@ func SetupRoutes() *gin.Engine {
 			hospitales.GET("/nearby", hospitalHandler.GetHospitalesNearby)
 			hospitales.GET("/:id", hospitalHandler.GetHospital)
 		}
-
-		// Ruta adicional de hospitales
 
 		// Gestión de historial clínico
 		historial := api.Group("/historial")
@@ -91,7 +89,7 @@ func SetupRoutes() *gin.Engine {
 			epidemiologia.GET("/contagious", historialHandler.GetContagiousHistorial)
 		}
 
-		// CORREGIDO: Sintaxis correcta para el grupo de propagación
+		// Propagación
 		propagacionGroup := api.Group("/propagacion")
 		{
 			// Análisis principal de velocidad de propagación
@@ -110,8 +108,18 @@ func SetupRoutes() *gin.Engine {
 			propagacionGroup.GET("/rutas", propagacionHandler.GetSpreadRoutes)
 		}
 
-		// Grupo público para datos de referencia (sin autenticación)
-		publicGroup := api.Group("/public/propagacion") // CORREGIDO: ruta simplificada
+		// CORREGIDO: Chatbot endpoints
+		chatbot := api.Group("/chatbot")
+		{
+			// Endpoint principal para conversación
+			chatbot.POST("/chat", chatbotHandler.Chat)
+			
+			// Verificación de estado del servicio
+			chatbot.GET("/health", chatbotHandler.HealthCheck)
+		}
+
+		// Grupo público para datos de referencia
+		publicGroup := api.Group("/public/propagacion")
 		{
 			// Información básica de distritos de Santa Cruz
 			publicGroup.GET("/distritos", func(c *gin.Context) {
@@ -225,8 +233,8 @@ func SetupRoutes() *gin.Engine {
 					"data":    conectividad,
 				})
 			})
-		} // CORREGIDO: Cierre correcto del publicGroup
-	} // CORREGIDO: Cierre correcto del api group
+		}
+	}
 
 	return router
 }
